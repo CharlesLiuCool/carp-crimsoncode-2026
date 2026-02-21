@@ -12,6 +12,9 @@ export default function App() {
     setLoading(true);
     setError(null);
     setResult(null);
+    
+
+
 
     try {
       const res = await fetch("http://localhost:5000/predict", {
@@ -45,8 +48,7 @@ export default function App() {
         <div className="header-inner">
           <div className="logo-mark">
             <span className="logo-pulse" />
-            <span className="logo-text">GLYCO</span>
-            <span className="logo-sub">ASSESS</span>
+            <span className="logo-text">carp</span>
           </div>
           <p className="header-tagline">AI-Powered Diabetes Risk Screening</p>
         </div>
