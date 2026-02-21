@@ -1,17 +1,18 @@
 import torch
 import torch.nn as nn
 
+
 class HospitalModel(nn.Module):
-    def __init__(self):
+    def __init__(self, n_features=8, dropout=0.3):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(8, 128),
+            nn.Linear(n_features, 32),
             nn.ReLU(),
-            nn.Linear(128, 64),
+            nn.Dropout(dropout),
+            nn.Linear(32, 16),
             nn.ReLU(),
-            nn.Linear(64, 32),
-            nn.ReLU(),
-            nn.Linear(32, 1)
+            nn.Dropout(dropout),
+            nn.Linear(16, 1),
         )
 
     def forward(self, x):
