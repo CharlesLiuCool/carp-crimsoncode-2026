@@ -8,7 +8,7 @@ if _repo_root not in sys.path:
 
 import torch
 import pandas as pd
-from backend.model import HospitalModel
+from model.model import HospitalModel
 
 def aggregate(csv_folder="hospital_client/hospital_csvs", temp_folder="backend/temp", public_folder="backend/public_model"):
     os.makedirs(temp_folder, exist_ok=True)
