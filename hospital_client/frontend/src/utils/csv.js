@@ -6,7 +6,7 @@ export const EXPECTED_COLUMNS = [
   "BMI",
   "DiabetesPedigreeFunction",
   "Age",
-  "Outcomes",
+  "Outcome",
 ];
 
 export const DIAGNOSIS_COLUMNS = [
