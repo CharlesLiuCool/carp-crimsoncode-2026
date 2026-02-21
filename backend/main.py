@@ -13,7 +13,7 @@ if _repo_root not in sys.path:
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from backend.aggregator import aggregate
-from backend.model import HospitalModel  # Make sure this is the merged model
+from model.model import HospitalModel  # Make sure this is the merged model
 
 # -------------------- APP SETUP --------------------
 app = FastAPI()
