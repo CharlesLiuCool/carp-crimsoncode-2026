@@ -70,3 +70,4 @@ htmlcov/
 # Optional: uncomment to exclude large/sensitive datasets from the repo
 # hospital_client/*.csv
 # !hospital_client/diabetes.csv
+node_modules/
