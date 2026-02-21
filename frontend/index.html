@@ -1,17 +1,23 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>DP Medical AI Demo</title>
+    <title>DP Medical AI Demo</title>
 </head>
 <body>
 
 <h1>Differential Privacy Medical Model</h1>
 
-<button onclick="trainHospital()">Simulate Hospital Training</button>
+<!-- File upload input -->
+<input type="file" id="fileInput">
+<button onclick="trainHospital()">Upload & Train Hospital Model</button>
+<br><br>
+
+<!-- Test prediction -->
+<button onclick="testPrediction()">Get Test Prediction</button>
 
 <p id="status"></p>
+<p id="prediction"></p>
 
 <script src="app.js"></script>
-
 </body>
 </html>

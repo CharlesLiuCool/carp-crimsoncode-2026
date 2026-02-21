@@ -1,45 +1,60 @@
-import sys
 import os
-
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
-import torch
 import pandas as pd
-from torch.utils.data import DataLoader, TensorDataset
+import torch
+from torch import nn, optim
+from torch.utils.data import TensorDataset, DataLoader
 from opacus import PrivacyEngine
 from backend.model import HospitalModel
 
-# Load hospital data
-csv = pd.read_csv("hospital_client/hospital_A.csv")
-X = torch.tensor(csv.iloc[:, :-1].values).float()
-y = torch.tensor(csv.iloc[:, -1].values).float().unsqueeze(1)
+# ---------- CONFIG ----------
+HOSPITAL_CSV = "hospital_A.csv"  # change to hospital_B.csv for other hospital
+BATCH_SIZE = 32
+EPOCHS = 5
+LR = 0.01
+NOISE_MULTIPLIER = 1.0  # adjust for privacy
+MAX_GRAD_NORM = 1.0
+DELTA = 1e-5
+
+# ---------- LOAD DATA ----------
+df = pd.read_csv(os.path.join(os.path.dirname(__file__), HOSPITAL_CSV))
+X = torch.tensor(df.drop("Outcome", axis=1).values, dtype=torch.float32)
+y = torch.tensor(df["Outcome"].values, dtype=torch.float32).unsqueeze(1)
 
 dataset = TensorDataset(X, y)
-loader = DataLoader(dataset, batch_size=32, shuffle=True)
+dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
 
+# ---------- INIT MODEL ----------
 model = HospitalModel()
-optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+criterion = nn.BCEWithLogitsLoss()
+optimizer = optim.SGD(model.parameters(), lr=LR)
 
-privacy_engine = PrivacyEngine()
-model, optimizer, loader = privacy_engine.make_private(
-    module=model,
-    optimizer=optimizer,
-    data_loader=loader,
-    noise_multiplier=1.0,
-    max_grad_norm=1.0,
+# ---------- ATTACH DP ----------
+privacy_engine = PrivacyEngine(
+    model,
+    batch_size=BATCH_SIZE,
+    sample_size=len(dataset),
+    alphas=[10, 100],
+    noise_multiplier=NOISE_MULTIPLIER,
+    max_grad_norm=MAX_GRAD_NORM
 )
+privacy_engine.attach(optimizer)
 
-# Train
-for epoch in range(5):
-    for X_batch, y_batch in loader:
-        pred = model(X_batch)
-        loss = ((pred - y_batch) ** 2).mean()
-
+# ---------- TRAIN ----------
+for epoch in range(EPOCHS):
+    for xb, yb in dataloader:
         optimizer.zero_grad()
+        preds = model(xb)
+        loss = criterion(preds, yb)
         loss.backward()
         optimizer.step()
+    print(f"Epoch {epoch+1}, Loss: {loss.item():.4f}")
 
-# Save private weights
-torch.save(model.state_dict(), "private_weights.pt")
+# ---------- SAVE DP WEIGHTS ----------
+os.makedirs("hospital_client", exist_ok=True)
+weights_path = os.path.join(os.path.dirname(__file__), "private_weights.pt")
+torch.save(model.state_dict(), weights_path)
+print(f"Saved DP weights to {weights_path}")
 
-print("Saved DP weights")
+# ---------- PRINT PRIVACY SPENT ----------
+epsilon, best_alpha = privacy_engine.get_privacy_spent(delta=DELTA)
+print(f"(ε, δ)-DP: ({epsilon:.2f}, {DELTA})")
