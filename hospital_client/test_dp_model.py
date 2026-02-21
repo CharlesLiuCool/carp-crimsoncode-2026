@@ -12,10 +12,13 @@ from model.model import HospitalModel
 
 # ---------- CONFIG ----------
 dp_model_file = "model/private_weights.pt"  # DP-trained model
+
+# ---------- SYNTHETIC TEST PATIENTS ----------
+# 1. Obvious diabetes: high glucose, high BMI, older age, high pregnancies
+# 2. Obvious non-diabetes: healthy ranges
 example_patients = [
-    [6, 148, 72, 35, 0, 33.6, 0.627, 50],
-    [1, 85, 66, 29, 0, 26.6, 0.351, 31],
-    [8, 183, 64, 0, 0, 23.3, 0.672, 32],
+    [8, 200, 90, 35, 200, 40.0, 1.5, 55],  # High-risk diabetes
+    [1, 90, 70, 20, 50, 22.0, 0.2, 25],    # Healthy patient
 ]
 
 # ---------- LOAD DP MODEL ----------
@@ -38,6 +41,13 @@ dp_model.eval()
 
 # ---------- TEST ----------
 inputs = torch.tensor(example_patients, dtype=torch.float32)
+
+# Optional: if you trained with normalized features, scale test inputs
+# from sklearn.preprocessing import StandardScaler
+# scaler = StandardScaler()
+# scaler.fit(training_X)  # fit on training data
+# inputs = torch.tensor(scaler.transform(example_patients), dtype=torch.float32)
+
 with torch.no_grad():
     logits = dp_model(inputs)
     probs = torch.sigmoid(logits)
