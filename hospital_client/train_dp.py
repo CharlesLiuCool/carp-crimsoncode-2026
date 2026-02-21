@@ -14,11 +14,20 @@ csv = pd.read_csv("hospital_client/hospital_A.csv")
 X = torch.tensor(csv.iloc[:, :-1].values).float()
 y = torch.tensor(csv.iloc[:, -1].values).float().unsqueeze(1)
 
+# Class balance: weight positive class (minority) so loss treats classes more equally
+n_pos = (y == 1).sum().item()
+n_neg = (y == 0).sum().item()
+pos_weight_val = n_neg / max(n_pos, 1)
+criterion = torch.nn.BCELoss(reduction="none")
+
 dataset = TensorDataset(X, y)
 loader = DataLoader(dataset, batch_size=32, shuffle=True)
 
 model = HospitalModel()
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+    optimizer, mode="min", factor=0.5, patience=3
+)
 
 privacy_engine = PrivacyEngine()
 model, optimizer, loader = privacy_engine.make_private(
@@ -29,15 +38,24 @@ model, optimizer, loader = privacy_engine.make_private(
     max_grad_norm=1.0,
 )
 
-# Train
-for epoch in range(5):
+# Train with BCE and class weighting; more epochs + LR scheduler for better convergence
+for epoch in range(60):
+    model.train()
+    epoch_loss = 0.0
+    n_batches = 0
     for X_batch, y_batch in loader:
         pred = model(X_batch)
-        loss = ((pred - y_batch) ** 2).mean()
+        bce = criterion(pred, y_batch)
+        w = (y_batch == 1).float() * (pos_weight_val - 1) + 1
+        loss = (bce * w).mean()
 
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+        epoch_loss += loss.item()
+        n_batches += 1
+    mean_loss = epoch_loss / max(n_batches, 1)
+    scheduler.step(mean_loss)
 
 # Save private weights
 torch.save(model.state_dict(), "private_weights.pt")
