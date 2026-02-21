@@ -7,51 +7,58 @@ if _repo_root not in sys.path:
     sys.path.insert(0, _repo_root)
 
 import torch
+import pandas as pd
 from model.model import HospitalModel
 
-def aggregate():
-    folder = "backend/temp"
-    os.makedirs(folder, exist_ok=True)
-    files = [f for f in os.listdir(folder) if f.endswith(".pt")]
+def aggregate(csv_folder="hospital_client/hospital_csvs", temp_folder="backend/temp", public_folder="backend/public_model"):
+    os.makedirs(temp_folder, exist_ok=True)
+    os.makedirs(public_folder, exist_ok=True)
 
+    # Get all DP weight files
+    files = [f for f in os.listdir(temp_folder) if f.endswith(".pt")]
     if not files:
-        print("No files to aggregate")
+        print("No DP weight files to aggregate in", temp_folder)
         return
+
+    # Optional: get dataset sizes for weighted averaging
+    sizes = []
+    for f in files:
+        csv_name = f.split("_dp.pt")[0]
+        csv_path = os.path.join(csv_folder, csv_name)
+        if os.path.exists(csv_path):
+            df = pd.read_csv(csv_path)
+            sizes.append(len(df))
+        else:
+            sizes.append(1)  # default weight if CSV missing
+
+    total_size = sum(sizes)
 
     # Initialize model
     model = HospitalModel()
     state_dict = model.state_dict()
-
-    # Zero out weights for averaging
     for key in state_dict:
         state_dict[key] = torch.zeros_like(state_dict[key])
 
-    count = 0
-    for file in files:
-        w_path = os.path.join(folder, file)
-        w = torch.load(w_path)
-
-        # If the weights were saved from a GradSampleModule, unwrap
-        if any(k.startswith("_module.") for k in w.keys()):
-            # Map keys from _module.* -> *
-            w = {k.replace("_module.", ""): v for k, v in w.items()}
-
-        # Add to accumulator
+    # Aggregate weights
+    for idx, f in enumerate(files):
+        w = torch.load(os.path.join(temp_folder, f))
+        weight_factor = sizes[idx] / total_size
         for key in state_dict:
-            if key in w:
-                state_dict[key] += w[key]
-            else:
-                print(f"Warning: key {key} not found in {file}")
-        count += 1
+            state_dict[key] += w[key] * weight_factor
 
-    # Average weights
-    for key in state_dict:
-        state_dict[key] /= count
-
-    # Load averaged weights into model
     model.load_state_dict(state_dict)
 
     # Save aggregated public model
-    os.makedirs("backend/public_model", exist_ok=True)
-    torch.save(model.state_dict(), "backend/public_model/latest_model.pt")
-    print(f"Aggregated {count} models successfully")
+    save_path = os.path.join(public_folder, "latest_model.pt")
+    torch.save(model.state_dict(), save_path)
+    print(f"Aggregated {len(files)} models successfully into {save_path}")
+
+    # Optional test prediction
+    model.eval()
+    test_input = torch.tensor([[6,148,72,35,0,33.6,0.627,50]], dtype=torch.float32)
+    with torch.no_grad():
+        pred = model(test_input)
+    print(f"Aggregated model test prediction: {pred.item():.4f}")
+
+    # Return model for immediate use
+    return model
