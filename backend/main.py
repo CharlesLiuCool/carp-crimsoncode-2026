@@ -1,9 +1,16 @@
+import os
+import sys
+
+# Ensure repo root is on path so "model" package is found
+_repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if _repo_root not in sys.path:
+    sys.path.insert(0, _repo_root)
+
 from fastapi import FastAPI
 import torch
-import os
 import json
 import numpy as np
-from backend.model import HospitalModel
+from model.model import HospitalModel
 
 app = FastAPI()
 public_model_path = "backend/public_model/latest_model.pt"

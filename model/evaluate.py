@@ -1,15 +1,16 @@
 import sys
 import os
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, repo_root)
 
 import torch
 import pandas as pd
-from backend.model import HospitalModel
+from model.model import HospitalModel
 
-weights_path = "private_weights.pt"
+weights_path = os.path.join(os.path.dirname(__file__), "private_weights.pt")
 if not os.path.isfile(weights_path):
-    print("Run train_dp.py first to create private_weights.pt")
+    print("Run model/train_dp.py first to create model/private_weights.pt")
     sys.exit(1)
 
 model = HospitalModel()
@@ -20,7 +21,8 @@ if any(k.startswith("_module.") for k in state):
 model.load_state_dict(state)
 model.eval()
 
-csv = pd.read_csv("hospital_client/hospital_B.csv")
+data_path = os.path.join(repo_root, "hospital_client/hospital_B.csv")
+csv = pd.read_csv(data_path)
 X_test = torch.tensor(csv.iloc[:, :-1].values).float()
 y_test = torch.tensor(csv.iloc[:, -1].values).float().unsqueeze(1)
 

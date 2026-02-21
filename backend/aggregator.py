@@ -1,6 +1,13 @@
-import torch
 import os
-from backend.model import HospitalModel
+import sys
+
+# Ensure repo root is on path so "model" package is found
+_repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if _repo_root not in sys.path:
+    sys.path.insert(0, _repo_root)
+
+import torch
+from model.model import HospitalModel
 
 def aggregate():
     # Absolute paths for safety

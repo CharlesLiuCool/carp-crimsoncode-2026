@@ -1,16 +1,18 @@
 import sys
 import os
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, repo_root)
 
 import torch
 import pandas as pd
 from torch.utils.data import DataLoader, TensorDataset
 from opacus import PrivacyEngine
-from backend.model import HospitalModel
+from model.model import HospitalModel
 
-# Load hospital data
-csv = pd.read_csv("hospital_client/hospital_A.csv")
+# Load hospital data (paths relative to repo root)
+data_path = os.path.join(repo_root, "hospital_client/hospital_A.csv")
+csv = pd.read_csv(data_path)
 X = torch.tensor(csv.iloc[:, :-1].values).float()
 y = torch.tensor(csv.iloc[:, -1].values).float().unsqueeze(1)
 
@@ -57,7 +59,8 @@ for epoch in range(60):
     mean_loss = epoch_loss / max(n_batches, 1)
     scheduler.step(mean_loss)
 
-# Save private weights
-torch.save(model.state_dict(), "private_weights.pt")
+# Save private weights to model folder
+weights_path = os.path.join(os.path.dirname(__file__), "private_weights.pt")
+torch.save(model.state_dict(), weights_path)
 
-print("Saved DP weights")
+print("Saved DP weights to model/private_weights.pt")
