@@ -1,12 +1,12 @@
+import os
 import requests
 
+# ---------- CONFIG ----------
+weights_path = os.path.join(os.path.dirname(__file__), "private_weights.pt")
 url = "http://127.0.0.1:8000/upload"
 
-files = {
-    "file": open("hospital_client/private_weights.pt", "rb")
-}
+# ---------- UPLOAD ----------
+with open(weights_path, "rb") as f:
+    response = requests.post(url, files={"file": f})
 
-response = requests.post(url, files=files)
-
-print("Status:", response.status_code)
-print("Text:", response.text)
+print(f"Uploaded weights: Status {response.status_code}, Text {response.text}")
