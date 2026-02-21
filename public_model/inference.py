@@ -7,5 +7,7 @@ model.eval()
 
 
 def predict(x):
+    """Return probability of having diabetes as a percentage (0-100)."""
     x = torch.tensor(x).float()
-    return model(x).item()
+    prob = model(x).item()
+    return round(prob * 100, 2)
