@@ -1,16 +1,24 @@
-from fastapi import FastAPI
-import torch
-from backend.model import HospitalModel
+from fastapi import FastAPI, UploadFile, File
+import os
+import shutil
+from backend.aggregator import aggregate
 
 app = FastAPI()
-public_model_path = "backend/public_model/latest_model.pt"
-model = HospitalModel()
-model.load_state_dict(torch.load(public_model_path))
-model.eval()
 
-@app.get("/predict")
-def predict():
-    # example dummy input
-    test_input = torch.tensor([[6,148,72,35,0,33.6,0.627,50]], dtype=torch.float32)
-    prediction = model(test_input)
-    return {"prediction": prediction.item()}
+UPLOAD_FOLDER = "backend/temp"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+@app.post("/upload")
+async def upload_weights(file: UploadFile = File(...)):
+    try:
+        file_path = os.path.join(UPLOAD_FOLDER, file.filename)
+        with open(file_path, "wb") as f:
+            shutil.copyfileobj(file.file, f)
+
+        # Aggregate all DP weights
+        aggregate()
+
+        return {"status": "aggregated"}
+    except Exception as e:
+        # Return the exception as JSON for debugging
+        return {"status": "error", "detail": str(e)}
