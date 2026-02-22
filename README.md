@@ -110,7 +110,7 @@ npm start
 
 ## 6. Using the Main AI Server
 
-Visit the public server URL and enter personal health information to receive a **diabetes risk percentage** powered by the aggregated model weights contributed by hospitals.
+Visit the public server URL and enter personal health information to receive a **diabetes risk percentage** powered by the aggregated model weights contributed by hospitals.(we dont have a url yet, it was expensive)
 
 ---
 
