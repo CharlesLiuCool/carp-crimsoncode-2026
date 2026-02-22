@@ -164,6 +164,51 @@ export default function DiagnosisTab() {
         </div>
       )}
 
+      {/* ── SHAP / Feature contributions ── */}
+      {status === "done" && result?.feature_contributions && (
+        <div className="card shap-card">
+          <label className="card-label">
+            How each factor contributed to your risk score
+          </label>
+          <p className="section-sub" style={{ marginTop: 0 }}>
+            Positive = increased risk, negative = decreased risk. The AI analysis
+            below references these contributions.
+          </p>
+          <div className="shap-list">
+            {["Age", "BMI", "Glucose"].map((name) => {
+              const value = result.feature_contributions[name];
+              if (value == null) return null;
+              const maxAbs = Math.max(
+                ...Object.values(result.feature_contributions).map(Math.abs),
+                0.001
+              );
+              const pct = (value / maxAbs) * 50;
+              const isPos = value >= 0;
+              return (
+                <div key={name} className="shap-row">
+                  <span className="shap-label">{name}</span>
+                  <div className="shap-bar-track">
+                    <div
+                      className={`shap-bar ${isPos ? "shap-bar-pos" : "shap-bar-neg"}`}
+                      style={{
+                        width: `${Math.min(50, Math.abs(pct))}%`,
+                        ...(isPos ? { left: "50%" } : { right: "50%" }),
+                      }}
+                    />
+                  </div>
+                  <span
+                    className={`shap-value ${isPos ? "shap-value-pos" : "shap-value-neg"}`}
+                  >
+                    {value > 0 ? "+" : ""}
+                    {Number(value).toFixed(3)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* ── LLM Analysis ── */}
       {status === "done" && result?.analysis && (
         <div className="card">

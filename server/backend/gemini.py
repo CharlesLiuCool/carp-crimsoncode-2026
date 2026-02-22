@@ -22,6 +22,7 @@ def _build_prompt(
     glucose: float,
     prediction: int,
     confidence: float,
+    feature_contributions: dict | None = None,
 ) -> str:
     risk_label = (
         "elevated diabetes risk" if prediction == 1 else "no elevated diabetes risk"
@@ -52,6 +53,11 @@ def _build_prompt(
         "young adult" if age < 35 else "middle-aged" if age < 55 else "older adult"
     )
 
+    fc = feature_contributions or {}
+    fc_age = fc.get("Age", 0)
+    fc_bmi = fc.get("BMI", 0)
+    fc_glucose = fc.get("Glucose", 0)
+
     return f"""You are a clinical decision-support assistant helping a medical professional interpret an AI-generated diabetes risk screening result. Be specific, evidence-based, and actionable. Reference the actual numbers — do not give generic advice.
 
 Patient vitals:
@@ -62,6 +68,7 @@ Patient vitals:
 AI screening model result:
 - Prediction: {risk_label}
 - Model confidence: {confidence_pct}%
+- Feature contributions (SHAP-style; positive = increases risk, negative = decreases risk): Age {fc_age}, BMI {fc_bmi}, Glucose {fc_glucose}. The factor with the largest absolute contribution drove the result most.
 
 Write a structured clinical note with the following four sections. Label each section clearly. Use plain text, no markdown, no bullet symbols.
 
@@ -69,7 +76,7 @@ VITAL INTERPRETATION
 In 2-3 sentences, explain what this specific combination of age, BMI, and glucose means for this patient's metabolic health. Reference the actual values and thresholds (e.g. ADA criteria, WHO BMI classifications).
 
 RISK FACTORS
-Identify which of the submitted values are concerning and which are within normal range. Quantify how far outside normal any values are. Note any compounding interactions between the values (e.g. high BMI combined with high glucose).
+Identify which of the submitted values are concerning and which are within normal range. Quantify how far outside normal any values are. Note any compounding interactions between the values (e.g. high BMI combined with high glucose). State which factor (Age, BMI, or Glucose) contributed most to the model's risk score using the feature contributions above.
 
 RECOMMENDED NEXT STEPS
 Give 3-5 specific, actionable recommendations tailored to this patient's numbers. Include: which follow-up tests are indicated (e.g. HbA1c, OGTT, fasting lipids), specific lifestyle targets appropriate to their BMI and glucose level, and whether referral to an endocrinologist or dietitian is warranted given the values.
@@ -159,13 +166,18 @@ def analyse_diagnosis(
     glucose: float,
     prediction: int,
     confidence: float,
+    feature_contributions: dict | None = None,
 ) -> tuple[str, str]:
     """
     Generate a clinical analysis, trying Groq first then Gemini as fallback.
 
+    feature_contributions: optional dict with keys Age, BMI, Glucose (SHAP-style values).
     Returns (analysis_text, provider_name), or raises if both providers fail.
     """
-    prompt = _build_prompt(age, bmi, glucose, prediction, confidence)
+    prompt = _build_prompt(
+        age, bmi, glucose, prediction, confidence,
+        feature_contributions=feature_contributions,
+    )
 
     try:
         result = _try_groq(prompt)
