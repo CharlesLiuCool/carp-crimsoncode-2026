@@ -36,6 +36,10 @@ SCALE_STD = np.array(
     [22.51730211875095, 6.608171633655254, 40.57052832219186], dtype=np.float32
 )
 
+# Lower threshold reduces false negatives at the cost of more false positives.
+# 0.5 = balanced, 0.35 = more sensitive (recommended for medical screening).
+CLASSIFICATION_THRESHOLD: float = 0.45
+
 # ── Blueprints ───────────────────────────────────────────────────────────────
 
 app.register_blueprint(weights_bp, url_prefix="/api/weights")
@@ -138,7 +142,7 @@ def diagnose():
     logit = model(X)
     prob = torch.sigmoid(logit).squeeze()
     prob_val = prob.item()
-    prediction = int(prob_val >= 0.5)
+    prediction = int(prob_val >= CLASSIFICATION_THRESHOLD)
     confidence = round(prob_val, 4)
 
     # SHAP-style feature contributions: gradient of prob w.r.t. input × input (gradient × input attribution)

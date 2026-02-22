@@ -20,6 +20,10 @@ LABEL = "Outcome"
 IMPUTE_COLS = ["Glucose", "BMI"]
 ARTIFACTS_DIR = os.path.join(os.path.dirname(__file__), "artifacts")
 
+# Lower threshold reduces false negatives at the cost of more false positives.
+# 0.5 = balanced, 0.35 = more sensitive (recommended for medical screening).
+CLASSIFICATION_THRESHOLD: float = 0.45
+
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 def _impute(df: pd.DataFrame) -> pd.DataFrame:
@@ -417,7 +421,7 @@ def predict_single(
         logit = model(X)
         prob = torch.sigmoid(logit / temperature).item()
 
-    prediction = int(prob >= 0.5)
+    prediction = int(prob >= CLASSIFICATION_THRESHOLD)
     return {
         "prediction": prediction,
         "confidence": round(prob, 4),
@@ -448,7 +452,7 @@ def predict_batch(df: pd.DataFrame, use_dp: bool = False) -> list[dict]:
     results = []
     for i, prob in enumerate(probs):
         prob = float(prob)
-        pred = int(prob >= 0.5)
+        pred = int(prob >= CLASSIFICATION_THRESHOLD)
         results.append(
             {
                 "row": i,
