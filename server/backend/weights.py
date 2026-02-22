@@ -5,6 +5,8 @@ from datetime import datetime, timezone
 
 import torch
 from aggregate import MIN_CONTRIBUTORS, aggregate
+from db import get_metrics_history
+from db import insert_metrics_history
 from db import insert_weights
 from db import list_weights as db_list_weights
 from evaluate import evaluate
@@ -133,6 +135,16 @@ def upload_weights():
         except Exception as exc:
             eval_error = str(exc)
             current_app.logger.warning("Evaluation failed: %s", exc)
+    if eval_result:
+        try:
+            insert_metrics_history(
+                accuracy=eval_result["accuracy"],
+                precision=eval_result["precision"],
+                recall=eval_result["recall"],
+                f1=eval_result["f1"],
+            )
+        except Exception:
+            pass
 
     response = {
         "message": f'"{filename}" uploaded successfully.',
@@ -172,3 +184,19 @@ def list_weights():
         return jsonify({"detail": f"Database error: {exc}"}), 500
 
     return jsonify({"weights": entries, "count": len(entries)}), 200
+
+
+# ── GET /api/weights/metrics-history ─────────────────────────────────────────
+
+
+@weights_bp.route("/metrics-history", methods=["GET"])
+def metrics_history():
+    try:
+        limit = min(int(request.args.get("limit", 3)), 10)
+    except (TypeError, ValueError):
+        limit = 3
+    try:
+        entries = get_metrics_history(limit=limit)
+    except Exception as exc:
+        return jsonify({"detail": str(exc)}), 500
+    return jsonify({"metrics": entries}), 200
