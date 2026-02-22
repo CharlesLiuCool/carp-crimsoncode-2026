@@ -8,10 +8,11 @@ load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 import numpy as np
 import torch
 from aggregate import aggregate, load_central_model
-from db import init_db
+from db import get_max_round_id, init_db
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from gemini import analyse_diagnosis
+from key_pool import init_key_pool
 from weights import weights_bp
 
 app = Flask(__name__)
@@ -53,6 +54,14 @@ def startup():
         app.logger.info("Database initialised.")
     except Exception as exc:
         app.logger.error("Database init failed: %s", exc)
+
+    try:
+        max_round = get_max_round_id()
+        start_round = (max_round + 1) if max_round is not None else 1
+        init_key_pool(initial_round_id=start_round)
+        app.logger.info("KeyPool initialised: starting at round_id=%d.", start_round)
+    except Exception as exc:
+        app.logger.error("KeyPool init failed: %s", exc)
 
     try:
         result = aggregate()

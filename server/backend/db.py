@@ -13,7 +13,9 @@ uploaded_weights
     size_kb     FLOAT NOT NULL
     uploaded_at TIMESTAMPTZ DEFAULT now()
     is_valid    BOOLEAN DEFAULT true   -- set false to exclude from FedAvg
-    weights     BYTEA NOT NULL         -- raw .pt file bytes
+    weights     BYTEA NOT NULL         -- raw masked .pt file bytes
+    round_id    INTEGER                -- which aggregation round this upload belongs to
+    slot        INTEGER                -- slot within the round (1, 2, or 3)
 """
 
 import io
@@ -37,8 +39,30 @@ CREATE TABLE IF NOT EXISTS uploaded_weights (
     size_kb     FLOAT NOT NULL,
     uploaded_at TIMESTAMPTZ DEFAULT now(),
     is_valid    BOOLEAN DEFAULT true,
-    weights     BYTEA NOT NULL
+    weights     BYTEA NOT NULL,
+    round_id    INTEGER,
+    slot        INTEGER
 );
+"""
+
+# Migration: add round_id and slot to existing uploaded_weights tables
+_MIGRATE_ROUNDS = """
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'uploaded_weights' AND column_name = 'round_id'
+    ) THEN
+        ALTER TABLE uploaded_weights ADD COLUMN round_id INTEGER;
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'uploaded_weights' AND column_name = 'slot'
+    ) THEN
+        ALTER TABLE uploaded_weights ADD COLUMN slot INTEGER;
+    END IF;
+END
+$$;
 """
 
 
@@ -65,6 +89,7 @@ def init_db() -> None:
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute(SCHEMA)
+            cur.execute(_MIGRATE_ROUNDS)
         conn.commit()
 
     logger.info("Database initialised.")
@@ -95,6 +120,8 @@ def insert_weights(
     sha256: str,
     size_kb: float,
     data: bytes,
+    round_id: int | None = None,
+    slot: int | None = None,
 ) -> int:
     """
     Insert a new weights record. Returns the new row id.
@@ -103,41 +130,58 @@ def insert_weights(
     ----------
     filename : original sanitised filename (e.g. dp_weights.pt)
     saved_as : unique timestamped name (e.g. 20260222T025610Z_dp_weights.pt)
-    sha256   : hex SHA-256 of the file bytes
+    sha256   : hex SHA-256 of the original (pre-mask) file bytes
     size_kb  : file size in kilobytes
-    data     : raw bytes of the .pt file
+    data     : masked .pt bytes to store
+    round_id : aggregation round this upload belongs to
+    slot     : slot within the round (1, 2, or 3)
     """
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
                 INSERT INTO uploaded_weights
-                    (filename, saved_as, sha256, size_kb, weights)
-                VALUES (%s, %s, %s, %s, %s)
+                    (filename, saved_as, sha256, size_kb, weights, round_id, slot)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
                 """,
-                (filename, saved_as, sha256, size_kb, psycopg2.Binary(data)),
+                (
+                    filename,
+                    saved_as,
+                    sha256,
+                    size_kb,
+                    psycopg2.Binary(data),
+                    round_id,
+                    slot,
+                ),
             )
             row_id = cur.fetchone()[0]
         conn.commit()
 
-    logger.info("Inserted weights row id=%d  saved_as=%s", row_id, saved_as)
+    logger.info(
+        "Inserted weights row id=%d  saved_as=%s  round=%s  slot=%s",
+        row_id,
+        saved_as,
+        round_id,
+        slot,
+    )
     return row_id
 
 
 def fetch_all_valid_weights() -> list[dict]:
     """
     Return all rows where is_valid=true as a list of dicts:
-        { id, filename, saved_as, sha256, size_kb, uploaded_at, weights_bytes }
+        { id, filename, saved_as, sha256, size_kb, uploaded_at, weights_bytes, round_id, slot }
+    Ordered by round_id then slot so complete rounds are grouped together.
     """
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT id, filename, saved_as, sha256, size_kb, uploaded_at, weights
+                SELECT id, filename, saved_as, sha256, size_kb, uploaded_at, weights, round_id, slot
                 FROM uploaded_weights
                 WHERE is_valid = true
-                ORDER BY uploaded_at ASC
+                ORDER BY round_id ASC NULLS LAST, slot ASC, uploaded_at ASC
                 """
             )
             rows = cur.fetchall()
@@ -151,6 +195,8 @@ def fetch_all_valid_weights() -> list[dict]:
             "size_kb": r[4],
             "uploaded_at": r[5].isoformat() if r[5] else None,
             "weights_bytes": bytes(r[6]),
+            "round_id": r[7],
+            "slot": r[8],
         }
         for r in rows
     ]
@@ -203,3 +249,20 @@ def weights_to_buffer(weights_bytes: bytes) -> io.BytesIO:
     buf = io.BytesIO(weights_bytes)
     buf.seek(0)
     return buf
+
+
+def get_max_round_id() -> int | None:
+    """
+    Return the highest round_id present in the uploaded_weights table, or
+    None if no rounds have been recorded yet.
+
+    Used at startup to resume round numbering after a server restart so
+    round IDs are never reused across sessions.
+    """
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT MAX(round_id) FROM uploaded_weights WHERE round_id IS NOT NULL"
+            )
+            row = cur.fetchone()
+    return int(row[0]) if row and row[0] is not None else None

@@ -3,11 +3,13 @@ import io
 import os
 from datetime import datetime, timezone
 
-from aggregate import aggregate
-from db import insert_weights, register_hospital
+import torch
+from aggregate import MIN_CONTRIBUTORS, aggregate
+from db import insert_weights
 from db import list_weights as db_list_weights
 from evaluate import evaluate
 from flask import Blueprint, current_app, jsonify, request
+from key_pool import get_key_pool
 from werkzeug.utils import secure_filename
 
 weights_bp = Blueprint("weights", __name__)
@@ -50,24 +52,52 @@ def upload_weights():
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     saved_as = f"{timestamp}_{filename}"
 
-    # Read bytes into memory — stored directly in PostgreSQL as BYTEA
+    # Read bytes into memory
     data = file.read()
     size_kb = round(len(data) / 1024, 2)
+    # Checksum is over the original bytes for duplicate detection
     checksum = _sha256_bytes(data)
 
-    # ── Persist to database ───────────────────────────────────────────────────
+    # ── Load state-dict and apply pre-computed round key mask ─────────────────
+    try:
+        state_dict = torch.load(io.BytesIO(data), map_location="cpu", weights_only=True)
+        if not isinstance(state_dict, dict):
+            return jsonify({"detail": "Uploaded file is not a valid state-dict."}), 400
+    except Exception as exc:
+        return jsonify({"detail": f"Could not parse weights file: {exc}"}), 400
+
+    key = get_key_pool().issue_key()
+    masked_state = get_key_pool().apply_key(state_dict, key)
+
+    buf = io.BytesIO()
+    torch.save(masked_state, buf)
+    masked_data = buf.getvalue()
+
+    current_app.logger.info(
+        "Mask applied: round=%d slot=%d  original=%.1f KB  masked=%.1f KB",
+        key["round_id"],
+        key["slot"],
+        size_kb,
+        round(len(masked_data) / 1024, 2),
+    )
+
+    # ── Persist masked weights to database ────────────────────────────────────
     try:
         row_id = insert_weights(
             filename=filename,
             saved_as=saved_as,
             sha256=checksum,
             size_kb=size_kb,
-            data=data,
+            data=masked_data,
+            round_id=key["round_id"],
+            slot=key["slot"],
         )
         current_app.logger.info(
-            "Weights stored in DB: id=%d  saved_as=%s  size=%.1f KB  sha256=%s",
+            "Weights stored in DB: id=%d  saved_as=%s  round=%d  slot=%d  size=%.1f KB  sha256=%s",
             row_id,
             saved_as,
+            key["round_id"],
+            key["slot"],
             size_kb,
             checksum,
         )
@@ -110,6 +140,8 @@ def upload_weights():
         "size_kb": size_kb,
         "sha256": checksum,
         "uploaded_at": timestamp,
+        "round_id": key["round_id"],
+        "slot": key["slot"],
     }
 
     if agg_result:
@@ -119,6 +151,7 @@ def upload_weights():
         }
     elif agg_error:
         response["aggregation_warning"] = agg_error
+        response["contributors_required"] = MIN_CONTRIBUTORS
 
     if eval_result:
         response["metrics"] = eval_result
