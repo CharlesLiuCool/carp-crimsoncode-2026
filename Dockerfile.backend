@@ -1,0 +1,24 @@
+# Backend: Flask app from hospital_client/backend (MergedModel, train, diagnose)
+FROM python:3.11-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Dependencies (root requirements-project.txt includes hospital_client/backend deps)
+COPY requirements-project.txt /app/requirements-project.txt
+RUN pip install --no-cache-dir -r /app/requirements-project.txt
+
+# App package and optional data (scaler can be built from merged_diabetes.csv on first run)
+COPY hospital_client/__init__.py /app/hospital_client/
+COPY hospital_client/backend /app/hospital_client/backend
+COPY hospital_client/merged_diabetes.csv /app/hospital_client/merged_diabetes.csv
+
+RUN mkdir -p /app/hospital_client/backend/artifacts
+
+ENV PYTHONPATH=/app
+EXPOSE 8000
+
+# Production WSGI server (Flask app is in hospital_client.backend.main)
+CMD ["gunicorn", "-w", "1", "-b", "0.0.0.0:8000", "hospital_client.backend.main:app"]
