@@ -1,25 +1,16 @@
-"""
-Central CARP server backend.
-
-Setup:
-    pip install -r requirements.txt
-
-Run (from server/backend/):
-    source .venv/bin/activate
-    python main.py
-
-Listens on http://localhost:8000
-The Vite dev server proxies /api/* here automatically.
-"""
-
 import logging
 import os
+
+from dotenv import load_dotenv
+
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
 import numpy as np
 import torch
 from aggregate import aggregate, load_central_model
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+from gemini import analyse_diagnosis
 from weights import weights_bp
 
 app = Flask(__name__)
@@ -125,18 +116,37 @@ def diagnose():
         prob = torch.sigmoid(logit).item()
 
     prediction = int(prob >= 0.5)
+    confidence = round(prob, 4)
 
-    return jsonify(
-        {
-            "prediction": prediction,
-            "confidence": round(prob, 4),
-            "message": (
-                "Elevated diabetes risk detected. Please consult a physician."
-                if prediction == 1
-                else "No significant diabetes risk detected."
-            ),
-        }
-    )
+    # ── LLM analysis ─────────────────────────────────────────────────────────
+    analysis = None
+    analysis_provider = None
+    try:
+        analysis, analysis_provider = analyse_diagnosis(
+            age=age,
+            bmi=bmi,
+            glucose=glucose,
+            prediction=prediction,
+            confidence=confidence,
+        )
+    except Exception as exc:
+        app.logger.warning("LLM analysis failed: %s", exc)
+
+    response = {
+        "prediction": prediction,
+        "confidence": confidence,
+        "message": (
+            "Elevated diabetes risk detected. Please consult a physician."
+            if prediction == 1
+            else "No significant diabetes risk detected."
+        ),
+    }
+
+    if analysis:
+        response["analysis"] = analysis
+        response["analysis_provider"] = analysis_provider
+
+    return jsonify(response)
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
