@@ -101,7 +101,7 @@ export default function TrainTab() {
         <h2>Upload Patient Dataset</h2>
         <p className="section-sub">
           Upload a CSV file with patient records to train the local model.
-          Weights will trained locally for downloading.
+          Weights will be trained locally for downloading.
         </p>
       </div>
 
