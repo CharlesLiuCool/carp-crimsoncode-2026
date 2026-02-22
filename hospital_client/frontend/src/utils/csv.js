@@ -1,23 +1,6 @@
-export const EXPECTED_COLUMNS = [
-  "Pregnancies",
-  "Glucose",
-  "BloodPressure",
-  "Insulin",
-  "BMI",
-  "DiabetesPedigreeFunction",
-  "Age",
-  "Outcome",
-];
+export const EXPECTED_COLUMNS = ["Age", "BMI", "Glucose", "Outcome", "Source"];
 
-export const DIAGNOSIS_COLUMNS = [
-  "Pregnancies",
-  "Glucose",
-  "BloodPressure",
-  "Insulin",
-  "BMI",
-  "DiabetesPedigreeFunction",
-  "Age",
-];
+export const DIAGNOSIS_COLUMNS = ["Age", "BMI", "Glucose"];
 
 export function parseCSV(text) {
   const lines = text.trim().split("\n");
