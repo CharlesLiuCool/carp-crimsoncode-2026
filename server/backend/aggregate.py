@@ -3,7 +3,7 @@ Federated averaging (FedAvg) for the central CARP server model.
 
 How it works
 ------------
-1. Load every .pt / .pth file from uploaded_weights/.
+1. Load every valid .pt row from the uploaded_weights PostgreSQL table.
 2. Average all state-dicts element-wise (equal weighting).
 3. Save the result to artifacts/central_model.pt.
 4. A temperature of 1.0 is used — no calibration data is available
@@ -13,11 +13,12 @@ Call aggregate() after every successful weight upload so the central
 model always reflects the latest set of hospital contributions.
 """
 
+import io
 import logging
 import os
 
 import torch
-
+from db import fetch_all_valid_weights
 from model import MergedModel
 
 logger = logging.getLogger(__name__)
@@ -25,31 +26,20 @@ logger = logging.getLogger(__name__)
 ARTIFACTS_DIR = os.path.join(os.path.dirname(__file__), "artifacts")
 CENTRAL_WEIGHTS = os.path.join(ARTIFACTS_DIR, "central_model.pt")
 
-ALLOWED_EXTENSIONS = {".pt", ".pth"}
-
-
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 
-def _weight_files(upload_dir: str) -> list[str]:
-    """Return sorted list of .pt/.pth files in upload_dir."""
-    return sorted(
-        os.path.join(upload_dir, f)
-        for f in os.listdir(upload_dir)
-        if os.path.splitext(f)[1].lower() in ALLOWED_EXTENSIONS
-    )
-
-
-def _load_state(path: str) -> dict | None:
+def _load_state_from_bytes(data: bytes, label: str) -> dict | None:
     """
-    Try to load a state-dict from path.
-    Returns None and logs a warning if the file is unreadable or has the
+    Try to load a state-dict from raw bytes.
+    Returns None and logs a warning if the data is unreadable or has the
     wrong keys (e.g. a full checkpoint rather than a bare state-dict).
     """
     try:
-        obj = torch.load(path, map_location="cpu", weights_only=True)
+        buf = io.BytesIO(data)
+        obj = torch.load(buf, map_location="cpu", weights_only=True)
     except Exception as exc:
-        logger.warning("Could not load %s: %s", path, exc)
+        logger.warning("Could not load %s: %s", label, exc)
         return None
 
     # Accept a bare state-dict or a dict that contains one under "state_dict"
@@ -62,41 +52,41 @@ def _load_state(path: str) -> dict | None:
         if set(obj.keys()) != expected:
             logger.warning(
                 "Skipping %s — keys don't match MergedModel (got %s, want %s)",
-                path,
+                label,
                 set(obj.keys()),
                 expected,
             )
             return None
         return obj
 
-    logger.warning("Skipping %s — not a state-dict", path)
+    logger.warning("Skipping %s — not a state-dict", label)
     return None
 
 
 # ── Core ──────────────────────────────────────────────────────────────────────
 
 
-def aggregate(upload_dir: str) -> dict:
+def aggregate() -> dict:
     """
-    Run FedAvg over every valid weight file in upload_dir.
+    Run FedAvg over every valid weights row in the database.
 
     Returns a summary dict:
         {
             "aggregated": int,   # number of weight files included
-            "skipped":    int,   # files that failed validation
+            "skipped":    int,   # rows that failed validation
             "central_model": str # path to saved central_model.pt
         }
     """
-    paths = _weight_files(upload_dir)
+    rows = fetch_all_valid_weights()
 
-    if not paths:
-        raise ValueError("No weight files found in upload directory.")
+    if not rows:
+        raise ValueError("No weight files found in the database.")
 
     state_dicts = []
     skipped = 0
 
-    for p in paths:
-        sd = _load_state(p)
+    for row in rows:
+        sd = _load_state_from_bytes(row["weights_bytes"], row["saved_as"])
         if sd is None:
             skipped += 1
         else:

@@ -8,6 +8,7 @@ load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 import numpy as np
 import torch
 from aggregate import aggregate, load_central_model
+from db import init_db
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from gemini import analyse_diagnosis
@@ -22,8 +23,6 @@ logging.basicConfig(level=logging.INFO)
 
 BACKEND_DIR = os.path.dirname(__file__)
 
-app.config["WEIGHTS_UPLOAD_DIR"] = os.path.join(BACKEND_DIR, "uploaded_weights")
-
 # Feature scaling parameters — must match the scaler used during hospital
 # client training (fit on the shared merged_diabetes.csv dataset).
 SCALE_MEAN = np.array(
@@ -37,13 +36,26 @@ SCALE_STD = np.array(
 
 app.register_blueprint(weights_bp, url_prefix="/api/weights")
 
-# ── Startup: aggregate any already-uploaded weights ──────────────────────────
+# ── Startup ───────────────────────────────────────────────────────────────────
 
-with app.app_context():
-    upload_dir = app.config["WEIGHTS_UPLOAD_DIR"]
-    os.makedirs(upload_dir, exist_ok=True)
+_started = False
+
+
+@app.before_request
+def startup():
+    global _started
+    if _started:
+        return
+    _started = True
+
     try:
-        result = aggregate(upload_dir=upload_dir)
+        init_db()
+        app.logger.info("Database initialised.")
+    except Exception as exc:
+        app.logger.error("Database init failed: %s", exc)
+
+    try:
+        result = aggregate()
         app.logger.info(
             "Startup aggregation: %d file(s) aggregated, %d skipped",
             result["aggregated"],
