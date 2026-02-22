@@ -97,6 +97,25 @@
     gap: 14px;
 }
 
+.header-logo-wrap {
+    flex-shrink: 0;
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.header-logo {
+    width: 96px;
+    height: 96px;
+    object-fit: contain;
+    display: block;
+}
+
 .header-title {
     font-size: 1.5rem;
     font-weight: 700;

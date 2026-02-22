@@ -14,6 +14,9 @@ export default function App() {
       <header className="header">
         <div className="header-inner">
           <div className="header-brand">
+            <div className="header-logo-wrap">
+              <img src="/carp-logo.png" alt="CARP Tech" className="header-logo" />
+            </div>
             <div>
               <h1 className="header-title">CARP</h1>
               <p className="header-sub">Diabetes Risk Screening</p>
