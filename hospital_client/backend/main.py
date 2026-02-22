@@ -111,10 +111,12 @@ def train_endpoint():
         os.unlink(tmp_path)
 
     eps_spent = result.get("epsilon_spent")
+    size_tier = result.get("size_tier", "")
+    tier_label = f" ({size_tier}-dataset preset)" if size_tier else ""
     message = (
-        f"Model trained successfully with DP-SGD (ε≈{eps_spent:.2f})."
+        f"Model trained successfully{tier_label} with DP-SGD (ε≈{eps_spent:.2f})."
         if eps_spent
-        else "Model trained successfully with no differential privacy."
+        else f"Model trained successfully{tier_label} with no differential privacy."
     )
 
     response = {"message": message, **result}

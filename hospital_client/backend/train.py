@@ -96,6 +96,37 @@ def _quick_metrics(
     )
 
 
+def _training_params_for_size(n_samples: int) -> dict:
+    """
+    Return epochs, batch_size, lr, patience (and size_tier label) based on dataset size.
+    Small datasets: fewer epochs, smaller batches to avoid overfitting and reduce noise.
+    Large datasets: more epochs, larger batches for efficiency.
+    """
+    if n_samples < 5_000:
+        return {
+            "epochs": 35,
+            "batch_size": 64,
+            "lr": 2e-3,
+            "patience": 6,
+            "size_tier": "small",
+        }
+    if n_samples < 25_000:
+        return {
+            "epochs": 50,
+            "batch_size": 128,
+            "lr": 1e-3,
+            "patience": 8,
+            "size_tier": "medium",
+        }
+    return {
+        "epochs": 60,
+        "batch_size": 256,
+        "lr": 1e-3,
+        "patience": 10,
+        "size_tier": "large",
+    }
+
+
 # ─── Scaler bootstrap ────────────────────────────────────────────────────────
 def build_scaler_from_merged(merged_csv_path: str) -> None:
     """
@@ -160,6 +191,14 @@ def train(
     missing = [c for c in FEATURES + [LABEL] if c not in df.columns]
     if missing:
         raise ValueError(f"CSV is missing required columns: {missing}")
+
+    n_samples = len(df)
+    size_params = _training_params_for_size(n_samples)
+    epochs = size_params["epochs"]
+    batch_size = min(size_params["batch_size"], n_samples)  # cap for tiny datasets
+    lr = size_params["lr"]
+    patience = size_params["patience"]
+    size_tier = size_params["size_tier"]
 
     df = _impute(df[FEATURES + [LABEL]])
     X_raw = df[FEATURES].values.astype(np.float32)
@@ -300,6 +339,9 @@ def train(
         "train_samples": len(X_train),
         "val_samples": len(X_val),
         "best_val_loss": round(best_val_loss, 4),
+        "size_tier": size_tier,
+        "epochs_used": epochs,
+        "batch_size_used": batch_size,
         **metrics,
     }
 
