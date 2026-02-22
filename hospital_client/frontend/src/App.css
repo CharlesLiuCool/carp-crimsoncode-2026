@@ -383,6 +383,55 @@ tr:hover td {
     font-family: "Courier New", monospace;
 }
 
+.slider-epsilon-input-row {
+    display: flex;
+    align-items: center;
+    background: var(--blue-50);
+    border: 1.5px solid var(--blue-200);
+    border-radius: 999px;
+    overflow: hidden;
+    transition:
+        border-color 0.15s,
+        box-shadow 0.15s;
+}
+
+.slider-epsilon-input-row:focus-within {
+    border-color: var(--blue-500);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.slider-epsilon-prefix {
+    padding: 5px 8px 5px 14px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--blue-600);
+    font-family: "Courier New", monospace;
+    user-select: none;
+    white-space: nowrap;
+}
+
+.slider-epsilon-input {
+    width: 62px;
+    border: none;
+    outline: none;
+    background: transparent;
+    padding: 5px 12px 5px 2px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    font-family: "Courier New", monospace;
+    color: var(--blue-700);
+    text-align: right;
+}
+
+.slider-epsilon-input::-webkit-inner-spin-button,
+.slider-epsilon-input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+}
+
+.slider-epsilon-input[type="number"] {
+    -moz-appearance: textfield;
+}
+
 .slider-track-wrapper {
     display: flex;
     align-items: center;
@@ -442,22 +491,28 @@ tr:hover td {
     cursor: pointer;
 }
 
-.slider-ticks {
+.slider-track-inner {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.slider-track-inner .slider {
+    width: 100%;
+}
+
+.slider-minmax-row {
     display: flex;
     justify-content: space-between;
     padding: 0 2px;
 }
 
-.tick {
-    width: 4px;
-    height: 4px;
-    border-radius: 50%;
-    background: var(--gray-300);
-    transition: background 0.2s;
-}
-
-.tick.active {
-    background: var(--blue-500);
+.slider-minmax {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--gray-400);
+    font-family: "Courier New", monospace;
 }
 
 .slider-badge-row {
@@ -495,10 +550,31 @@ tr:hover td {
     border: 1px solid #fed7aa;
 }
 
+.badge-hipaa {
+    background: var(--green-50);
+    color: var(--green-700);
+    border: 1px solid #bbf7d0;
+}
+
 .slider-hint {
     font-size: 0.8rem;
     color: var(--gray-500);
     line-height: 1.5;
+}
+
+.slider-hipaa-marker-row {
+    position: relative;
+    height: 16px;
+}
+
+.slider-hipaa-marker {
+    position: absolute;
+    left: 10%;
+    transform: translateX(-50%);
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--green-700);
+    white-space: nowrap;
 }
 
 /* ─── Alerts ─────────────────────────────────────────────────────────── */

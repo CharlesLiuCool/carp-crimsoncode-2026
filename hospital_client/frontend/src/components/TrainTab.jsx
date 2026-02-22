@@ -8,7 +8,8 @@ export default function TrainTab() {
   const [file, setFile] = useState(null);
   const [parsed, setParsed] = useState(null);
   const [error, setError] = useState("");
-  const [privacyLevel, setPrivacyLevel] = useState(5);
+  const [privacyLevel, setPrivacyLevel] = useState(1.0);
+  const [lastEpsilon, setLastEpsilon] = useState(null);
   const [status, setStatus] = useState(null); // null | 'loading' | 'success' | 'error'
   const [statusMsg, setStatusMsg] = useState("");
   const fileRef = useRef();
@@ -54,14 +55,18 @@ export default function TrainTab() {
     if (!file) return;
     setStatus("loading");
     setStatusMsg("");
-    const epsilon = ((privacyLevel / 10) * 9.9 + 0.1).toFixed(2);
+    const epsilon = privacyLevel.toFixed(2);
     const formData = new FormData();
     formData.append("file", file);
     formData.append("epsilon", epsilon);
     try {
       const res = await fetch("/api/train", { method: "POST", body: formData });
-      if (!res.ok) throw new Error(`Server responded with ${res.status}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `Server responded with ${res.status}`);
+      }
       const data = await res.json();
+      setLastEpsilon(epsilon);
       setStatus("success");
       setStatusMsg(
         data.message ||
@@ -79,7 +84,15 @@ export default function TrainTab() {
     setError("");
     setStatus(null);
     setStatusMsg("");
+    setLastEpsilon(null);
     if (fileRef.current) fileRef.current.value = "";
+  }
+
+  function exportWeights() {
+    const a = document.createElement("a");
+    a.href = "/api/weights/export";
+    a.download = "carp_dp_weights.pt";
+    a.click();
   }
 
   return (
@@ -176,9 +189,20 @@ export default function TrainTab() {
               <span className="spinner" /> Training Model...
             </>
           ) : (
-            "Train & Submit Weights"
+            "Train Weights"
           )}
         </button>
+        {status === "success" &&
+          lastEpsilon &&
+          parseFloat(lastEpsilon) < 9.5 && (
+            <button
+              className="btn btn-ghost"
+              onClick={() => exportWeights()}
+              title="Download differentially private model weights"
+            >
+              Export DP Weights
+            </button>
+          )}
         {file && status !== "loading" && (
           <button className="btn btn-ghost" onClick={reset}>
             Clear

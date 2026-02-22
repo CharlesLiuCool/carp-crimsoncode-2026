@@ -3,7 +3,7 @@ import os
 import tempfile
 
 import pandas as pd
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
 
 from hospital_client.backend.train import (
@@ -175,6 +175,27 @@ def diagnose_csv():
         return jsonify({"detail": str(e)}), 500
 
     return jsonify({"count": len(results), "results": results})
+
+
+# ─── Export weights ───────────────────────────────────────────────────────────
+@app.get("/api/weights/export")
+def export_weights():
+    """
+    Download the differentially private model weights as a .pt file.
+    """
+    weights_path = os.path.join(ARTIFACTS_DIR, "dp_weights.pt")
+
+    if not os.path.isfile(weights_path):
+        return jsonify(
+            {"detail": "dp_weights.pt not found. Run training with DP first."}
+        ), 404
+
+    return send_file(
+        weights_path,
+        mimetype="application/octet-stream",
+        as_attachment=True,
+        download_name="carp_dp_weights.pt",
+    )
 
 
 # ─── Entry point ─────────────────────────────────────────────────────────────
