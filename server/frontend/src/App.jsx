@@ -1,35 +1,52 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { useState } from "react";
+import "./App.css";
+import DiagnosisTab from "./components/DiagnosisTab";
+import WeightsTab from "./components/WeightsTab";
 
-function App() {
-  const [count, setCount] = useState(0)
+// Add new tab labels here as the server frontend grows.
+// Each entry needs a corresponding tab panel rendered in <main> below.
+const TABS = [
+  { label: "Patient Diagnosis", component: <DiagnosisTab /> },
+  { label: "Upload Weights", component: <WeightsTab /> },
+  // { label: "Analytics",      component: <AnalyticsTab /> },
+];
+
+export default function App() {
+  const [activeTab, setActiveTab] = useState(0);
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
-}
+    <div className="app">
+      <header className="header">
+        <div className="header-inner">
+          <div className="header-brand">
+            <div>
+              <h1 className="header-title">CARP</h1>
+              <p className="header-sub">Diabetes Risk Screening</p>
+            </div>
+          </div>
+        </div>
+      </header>
 
-export default App
+      <main className="main">
+        <div className="container">
+          {/* Tab bar — only rendered when there is more than one tab */}
+          {TABS.length > 1 && (
+            <div className="tabs">
+              {TABS.map((tab, i) => (
+                <button
+                  key={tab.label}
+                  className={`tab-btn ${activeTab === i ? "tab-active" : ""}`}
+                  onClick={() => setActiveTab(i)}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {TABS[activeTab].component}
+        </div>
+      </main>
+    </div>
+  );
+}
