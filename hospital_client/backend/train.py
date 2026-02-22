@@ -36,13 +36,11 @@ def _unwrap(model):
     return model._module if hasattr(model, "_module") else model
 
 
-def _epsilon_to_noise_multiplier(epsilon: float) -> float:
-    """
-    Map the UI epsilon (0.1 = max privacy, 10.0 = max accuracy) to a
-    DP-SGD noise_multiplier.  Higher epsilon → less noise.
-    """
-    epsilon = max(0.1, min(10.0, epsilon))
-    return max(0.3, min(2.0, 1.5 / epsilon))
+# Safety margin applied to the epsilon budget check during training.
+# Training stops when epsilon_spent >= epsilon * (1 - EPSILON_SAFETY_MARGIN),
+# leaving headroom so the final epoch's overshoot stays within the target.
+# e.g. target=0.63, margin=0.10 → stop at 0.567 → final spend ≈ 0.63
+EPSILON_SAFETY_MARGIN: float = 0.10
 
 
 def _learn_temperature(model, X_val: torch.Tensor, y_val: torch.Tensor) -> float:
@@ -259,20 +257,27 @@ def train(
     noise_multiplier = None
 
     if use_dp:
-        noise_multiplier = _epsilon_to_noise_multiplier(epsilon)
         privacy_engine = PrivacyEngine()
-        model, optimizer, loader = privacy_engine.make_private(
+        # make_private_with_epsilon computes the exact noise multiplier so the
+        # epsilon budget is consumed gradually and evenly across all planned
+        # epochs — prevents exhausting the budget in epoch 1 on small datasets.
+        model, optimizer, loader = privacy_engine.make_private_with_epsilon(
             module=model,
             optimizer=optimizer,
             data_loader=loader,
-            noise_multiplier=noise_multiplier,
+            target_epsilon=epsilon,
+            target_delta=delta,
             max_grad_norm=1.0,
+            epochs=epochs,
         )
+        noise_multiplier = optimizer.noise_multiplier
 
     # ── Training loop ─────────────────────────────────────────────────────────
     best_val_loss = float("inf")
     patience_counter = 0
     best_state = None
+    epsilon_budget_exhausted = False
+    epochs_run = 0
 
     for epoch in range(epochs):
         # Train
@@ -286,6 +291,18 @@ def train(
             epoch_loss += loss.item()
             n_batches += 1
         train_loss = epoch_loss / max(n_batches, 1)
+        epochs_run += 1
+
+        # ── Epsilon budget check (DP only) ────────────────────────────────────
+        # make_private_with_epsilon already calibrates noise so the budget is
+        # consumed over all planned epochs. This check is a safety net only —
+        # it fires if accumulation runs ahead of schedule (e.g. early stopping
+        # cut the batch count short). The margin avoids a one-epoch overshoot.
+        if use_dp and privacy_engine is not None:
+            eps_so_far = privacy_engine.accountant.get_epsilon(delta=delta)
+            if eps_so_far >= epsilon * (1 - EPSILON_SAFETY_MARGIN):
+                epsilon_budget_exhausted = True
+                break
 
         # Validate
         inf_model = _unwrap(model)
@@ -335,12 +352,18 @@ def train(
         "use_dp": use_dp,
         "noise_multiplier": noise_multiplier,
         "epsilon_spent": epsilon_spent,
+        "epsilon_budget_exhausted": epsilon_budget_exhausted,
+        "epsilon_target": round(epsilon, 4),
+        "epsilon_effective_budget": round(epsilon * (1 - EPSILON_SAFETY_MARGIN), 4),
         "temperature": round(temperature, 4),
         "train_samples": len(X_train),
         "val_samples": len(X_val),
-        "best_val_loss": round(best_val_loss, 4),
+        "best_val_loss": round(best_val_loss, 4)
+        if best_val_loss != float("inf")
+        else None,
         "size_tier": size_tier,
-        "epochs_used": epochs,
+        "epochs_run": epochs_run,
+        "epochs_planned": epochs,
         "batch_size_used": batch_size,
         **metrics,
     }

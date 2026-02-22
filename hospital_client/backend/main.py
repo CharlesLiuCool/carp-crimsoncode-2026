@@ -122,13 +122,30 @@ def train_endpoint():
         os.unlink(tmp_path)
 
     eps_spent = result.get("epsilon_spent")
+    budget_exhausted = result.get("epsilon_budget_exhausted", False)
+    epochs_run = result.get("epochs_run", 0)
+    epochs_planned = result.get("epochs_planned", 1)
     size_tier = result.get("size_tier", "")
     tier_label = f" ({size_tier}-dataset preset)" if size_tier else ""
-    message = (
-        f"Model trained successfully{tier_label} with DP-SGD (ε≈{eps_spent:.2f})."
-        if eps_spent
-        else f"Model trained successfully{tier_label} with no differential privacy."
-    )
+
+    # Only call it "stopped early" if the budget check fired well before the
+    # planned epoch limit — e.g. less than 80% of epochs were run.
+    truly_early = budget_exhausted and (epochs_run < epochs_planned * 0.8)
+
+    if eps_spent and truly_early:
+        message = (
+            f"Model trained successfully{tier_label} with DP-SGD — "
+            f"stopped early at epoch {epochs_run}/{epochs_planned}: "
+            f"ε budget reached (ε≈{eps_spent:.2f})."
+        )
+    elif eps_spent:
+        message = (
+            f"Model trained successfully{tier_label} with DP-SGD (ε≈{eps_spent:.2f})."
+        )
+    else:
+        message = (
+            f"Model trained successfully{tier_label} with no differential privacy."
+        )
 
     response = {"message": message, **result}
     if warning:
