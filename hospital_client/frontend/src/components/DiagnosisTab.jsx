@@ -2,7 +2,6 @@ import "../App.css";
 import { useState } from "react";
 import { DIAGNOSIS_COLUMNS } from "../utils/csv";
 
-// Central server base URL for diagnosis (uses aggregated model). Set in .env as VITE_CENTRAL_SERVER_URL.
 const CENTRAL_SERVER_URL = (import.meta.env.VITE_CENTRAL_SERVER_URL || "").replace(/\/$/, "");
 
 function getDiagnoseUrl() {

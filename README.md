@@ -56,24 +56,26 @@ Open `.env` and configure any required API keys or settings (e.g., server URLs, 
 
 ## 3. Running with Docker (Recommended)
 
-The entire stack is dockerized. Simply run:
+All Docker files live in the `Dockerize/` folder. From the **project root**, run:
 
 ```bash
-docker-compose up --build
+docker compose -f Dockerize/docker-compose.yml up --build -d
 ```
 
-This will spin up all services defined in `docker-compose.yml`, including:
-- The **hospital client** (frontend + backend)
-- The **main AI server** (frontend + backend)
+This builds and starts all services (build context is the project root so the app code is included):
+- **Hospital client** — backend on port 8000, frontend on 8081
+- **Main AI server** — backend on 8001, frontend on 8082, PostgreSQL for weights
 
 Once running, visit:
-- **Hospital Client:** `http://localhost:3000` (or whichever port is configured)
-- **Main AI Server:** `http://localhost:5000` (or whichever port is configured)
+- **Hospital Client:** http://localhost:8081 (frontend), http://localhost:8000 (backend API)
+- **Main AI Server:** http://localhost:8082 (frontend), http://localhost:8001 (backend API)
+
+Ensure `.env` exists at the project root (copy from `.env.example`) if the server needs API keys (e.g. Groq/Gemini for AI guidance).
 
 To stop all services:
 
 ```bash
-docker-compose down
+docker compose -f Dockerize/docker-compose.yml down
 ```
 
 ---
@@ -131,14 +133,15 @@ python test_secure_agg.py
 carp-crimsoncode-2026/
 ├── hospital_client/          # Local hospital frontend + backend
 ├── server/                   # Public AI server frontend + backend
-├── docker-compose.yml        # Orchestrates all services
-├── Dockerfile.backend        # Hospital client backend image
-├── Dockerfile.frontend       # Hospital client frontend image
-├── Dockerfile.server-backend # Server backend image
-├── Dockerfile.server-frontend# Server frontend image
-├── .env.example              # Environment variable template
-├── requirements.txt          # Python dependencies
-└── test_secure_agg.py        # Secure aggregation tests
+├── Dockerize/                # All Docker config (run from project root with -f Dockerize/docker-compose.yml)
+│   ├── docker-compose.yml    # Orchestrates all services
+│   ├── Dockerfile.backend    # Hospital client backend image
+│   ├── Dockerfile.frontend   # Hospital client frontend image
+│   ├── Dockerfile.server-backend
+│   └── Dockerfile.server-frontend
+├── .env.example              # Environment variable template (copy to .env at project root)
+├── requirements-project.txt # Python dependencies
+└── test_secure_agg.py       # Secure aggregation tests
 ```
 
 ---

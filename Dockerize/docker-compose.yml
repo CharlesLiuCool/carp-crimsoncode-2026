@@ -1,9 +1,12 @@
+# Run from project root:  docker compose -f Dockerize/docker-compose.yml up -d
+# Build context is project root (..) so COPY in Dockerfiles see hospital_client/, server/, etc.
+
 services:
   # ─── Hospital client ──────────────────────────────────────────
   backend:
     build:
-      context: .
-      dockerfile: Dockerfile.backend
+      context: ..
+      dockerfile: Dockerize/Dockerfile.backend
     ports:
       - "8000:8000"
     volumes:
@@ -17,8 +20,8 @@ services:
 
   frontend:
     build:
-      context: .
-      dockerfile: Dockerfile.frontend
+      context: ..
+      dockerfile: Dockerize/Dockerfile.frontend
     ports:
       - "8081:80"
     depends_on:
@@ -43,20 +46,19 @@ services:
 
   server_backend:
     build:
-      context: .
-      dockerfile: Dockerfile.server-backend
+      context: ..
+      dockerfile: Dockerize/Dockerfile.server-backend
     ports:
       - "8001:8001"
     env_file:
-      - .env
+      - ../.env
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-carp}:${POSTGRES_PASSWORD:-carp}@db:5432/${POSTGRES_DB:-carp}
       AGGREGATION_SECRET: ${AGGREGATION_SECRET:-carp-default-secret-change-in-production}
       MIN_CONTRIBUTORS: ${MIN_CONTRIBUTORS:-3}
     volumes:
       - server_artifacts:/app/artifacts
-      # Mount root .env so load_dotenv("/app/.env") reads keys (fallback if env_file fails)
-      - ./.env:/app/.env:ro
+      - ../.env:/app/.env:ro
     depends_on:
       db:
         condition: service_healthy
@@ -69,8 +71,8 @@ services:
 
   server_frontend:
     build:
-      context: .
-      dockerfile: Dockerfile.server-frontend
+      context: ..
+      dockerfile: Dockerize/Dockerfile.server-frontend
     ports:
       - "8082:80"
     depends_on:
