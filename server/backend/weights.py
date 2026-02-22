@@ -4,7 +4,7 @@ import os
 from datetime import datetime, timezone
 
 from aggregate import aggregate
-from db import insert_weights
+from db import insert_weights, register_hospital
 from db import list_weights as db_list_weights
 from evaluate import evaluate
 from flask import Blueprint, current_app, jsonify, request

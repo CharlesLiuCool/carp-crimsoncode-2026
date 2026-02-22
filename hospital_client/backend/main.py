@@ -1,4 +1,5 @@
 import io
+import logging
 import os
 import tempfile
 
@@ -16,7 +17,17 @@ from hospital_client.backend.train import (
 
 # ─── App ──────────────────────────────────────────────────────────────────────
 app = Flask(__name__)
-CORS(app, origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:8081", "http://127.0.0.1:8081", "http://localhost", "http://127.0.0.1"])
+CORS(
+    app,
+    origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:8081",
+        "http://127.0.0.1:8081",
+        "http://localhost",
+        "http://127.0.0.1",
+    ],
+)
 
 ARTIFACTS_DIR = os.path.join(os.path.dirname(__file__), "artifacts")
 MERGED_CSV = os.path.join(os.path.dirname(__file__), "..", "merged_diabetes.csv")
