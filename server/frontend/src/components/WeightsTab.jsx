@@ -7,11 +7,39 @@ function getFileExt(name) {
   return name.slice(name.lastIndexOf(".")).toLowerCase();
 }
 
+function MetricBar({ label, value }) {
+  const pct = (value * 100).toFixed(1);
+  return (
+    <div className="form-field">
+      <label>{label}</label>
+      <div className="confidence-row">
+        <div className="confidence-bar-track">
+          <div
+            className="confidence-bar-fill"
+            style={{
+              width: `${pct}%`,
+              background:
+                value >= 0.75
+                  ? "#22c55e"
+                  : value >= 0.5
+                    ? "#f59e0b"
+                    : "#ef4444",
+            }}
+          />
+        </div>
+        <span className="confidence-pct">{pct}%</span>
+      </div>
+    </div>
+  );
+}
+
 export default function WeightsTab() {
   const [file, setFile] = useState(null);
   const [error, setError] = useState("");
   const [status, setStatus] = useState(null); // null | 'loading' | 'success' | 'error'
   const [statusMsg, setStatusMsg] = useState("");
+  const [metrics, setMetrics] = useState(null);
+  const [aggregation, setAggregation] = useState(null);
   const fileRef = useRef();
 
   function handleFile(f) {
@@ -27,6 +55,8 @@ export default function WeightsTab() {
     setError("");
     setStatus(null);
     setStatusMsg("");
+    setMetrics(null);
+    setAggregation(null);
     setFile(f);
   }
 
@@ -40,6 +70,8 @@ export default function WeightsTab() {
     setError("");
     setStatus(null);
     setStatusMsg("");
+    setMetrics(null);
+    setAggregation(null);
     if (fileRef.current) fileRef.current.value = "";
   }
 
@@ -47,6 +79,8 @@ export default function WeightsTab() {
     if (!file) return;
     setStatus("loading");
     setStatusMsg("");
+    setMetrics(null);
+    setAggregation(null);
 
     const formData = new FormData();
     formData.append("file", file);
@@ -67,6 +101,8 @@ export default function WeightsTab() {
       setStatusMsg(
         data.message || "Weights uploaded and registered successfully.",
       );
+      if (data.metrics) setMetrics(data.metrics);
+      if (data.aggregation) setAggregation(data.aggregation);
     } catch (err) {
       setStatus("error");
       setStatusMsg(err.message || "Failed to connect to the server.");
@@ -135,6 +171,16 @@ export default function WeightsTab() {
           <div>
             <strong>Upload Successful</strong>
             <p>{statusMsg}</p>
+            {aggregation && (
+              <p style={{ marginTop: 4, fontSize: "0.82rem", opacity: 0.8 }}>
+                Aggregated from {aggregation.aggregated} weight file
+                {aggregation.aggregated !== 1 ? "s" : ""}
+                {aggregation.skipped > 0
+                  ? `, ${aggregation.skipped} skipped`
+                  : ""}
+                .
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -144,6 +190,54 @@ export default function WeightsTab() {
           <div>
             <strong>Upload Failed</strong>
             <p>{statusMsg}</p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Accuracy card ── */}
+      {metrics && (
+        <div className="card">
+          <label className="card-label">
+            Central Model Accuracy
+            <span className="preview-count">
+              {" "}
+              — {metrics.total.toLocaleString()} test samples
+            </span>
+          </label>
+
+          <div className="form-grid">
+            <MetricBar label="Accuracy" value={metrics.accuracy} />
+            <MetricBar label="F1 Score" value={metrics.f1} />
+            <MetricBar label="Precision" value={metrics.precision} />
+            <MetricBar label="Recall" value={metrics.recall} />
+          </div>
+
+          <div className="table-scroll" style={{ marginTop: 8 }}>
+            <table>
+              <thead>
+                <tr>
+                  <th></th>
+                  <th>Predicted Positive</th>
+                  <th>Predicted Negative</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <strong>Actual Positive</strong>
+                  </td>
+                  <td>TP: {metrics.tp}</td>
+                  <td>FN: {metrics.fn}</td>
+                </tr>
+                <tr>
+                  <td>
+                    <strong>Actual Negative</strong>
+                  </td>
+                  <td>FP: {metrics.fp}</td>
+                  <td>TN: {metrics.tn}</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       )}
@@ -162,7 +256,7 @@ export default function WeightsTab() {
             "Upload Weights"
           )}
         </button>
-        {file && status !== "loading" && (
+        {(file || status === "success") && status !== "loading" && (
           <button className="btn btn-ghost" onClick={reset}>
             Clear
           </button>

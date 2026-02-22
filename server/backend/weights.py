@@ -3,6 +3,7 @@ import os
 from datetime import datetime, timezone
 
 from aggregate import aggregate
+from evaluate import evaluate
 from flask import Blueprint, current_app, jsonify, request
 from werkzeug.utils import secure_filename
 
@@ -79,6 +80,21 @@ def upload_weights():
         agg_error = str(exc)
         current_app.logger.warning("FedAvg failed after upload: %s", exc)
 
+    # ── Evaluate: score the new central model against held-out test data ─────
+    eval_result = None
+    eval_error = None
+    if agg_result:
+        try:
+            eval_result = evaluate()
+            current_app.logger.info(
+                "Evaluation complete: accuracy=%.4f  f1=%.4f",
+                eval_result["accuracy"],
+                eval_result["f1"],
+            )
+        except Exception as exc:
+            eval_error = str(exc)
+            current_app.logger.warning("Evaluation failed: %s", exc)
+
     response = {
         "message": f'"{filename}" uploaded successfully.',
         "saved_as": saved_name,
@@ -94,6 +110,11 @@ def upload_weights():
         }
     elif agg_error:
         response["aggregation_warning"] = agg_error
+
+    if eval_result:
+        response["metrics"] = eval_result
+    elif eval_error:
+        response["metrics_warning"] = eval_error
 
     return jsonify(response), 201
 
