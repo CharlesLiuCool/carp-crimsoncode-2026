@@ -22,7 +22,7 @@ ARTIFACTS_DIR = os.path.join(os.path.dirname(__file__), "artifacts")
 
 # Lower threshold reduces false negatives at the cost of more false positives.
 # 0.5 = balanced, 0.35 = more sensitive (recommended for medical screening).
-CLASSIFICATION_THRESHOLD: float = 0.45
+CLASSIFICATION_THRESHOLD: float = 0.5
 
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -346,8 +346,8 @@ def train(
 
     # ── Save updated artifacts ────────────────────────────────────────────────
     os.makedirs(ARTIFACTS_DIR, exist_ok=True)
-    weights_file = "dp_weights.pt" if use_dp else "weights.pt"
-    temp_file = "dp_temperature.pt" if use_dp else "temperature.pt"
+    weights_file = "dp_weights.pt"
+    temp_file = "dp_temperature.pt"
 
     torch.save(inf_model.state_dict(), os.path.join(ARTIFACTS_DIR, weights_file))
     torch.save(torch.tensor([temperature]), os.path.join(ARTIFACTS_DIR, temp_file))

@@ -72,8 +72,7 @@ export default function TrainTab() {
       setLastEpsilon(epsilon);
       setStatus("success");
       setStatusMsg(
-        data.message ||
-          "Model trained and weights uploaded to the central server successfully.",
+        data.message || "Model trained and weights created successfully.",
       );
       setDatasetWarning(data.warning || "");
     } catch (err) {
@@ -158,8 +157,9 @@ export default function TrainTab() {
         {error && <p className="error-msg">{error}</p>}
         {parsed && parsed.rows.length < MIN_SAMPLES_WARNING && (
           <div className="alert alert-warning" style={{ marginTop: "10px" }}>
-            <strong>Small dataset:</strong> This file has {parsed.rows.length} rows.
-            Results may be unreliable. Consider using at least {MIN_SAMPLES_WARNING} samples.
+            <strong>Small dataset:</strong> This file has {parsed.rows.length}{" "}
+            rows. Results may be unreliable. Consider using at least{" "}
+            {MIN_SAMPLES_WARNING} samples.
           </div>
         )}
       </div>
@@ -211,17 +211,15 @@ export default function TrainTab() {
             "Train Weights"
           )}
         </button>
-        {status === "success" &&
-          lastEpsilon &&
-          parseFloat(lastEpsilon) < 9.5 && (
-            <button
-              className="btn btn-ghost"
-              onClick={() => exportWeights()}
-              title="Download differentially private model weights"
-            >
-              Export DP Weights
-            </button>
-          )}
+        {status === "success" && (
+          <button
+            className="btn btn-ghost"
+            onClick={() => exportWeights()}
+            title="Download differentially private model weights"
+          >
+            Export DP Weights
+          </button>
+        )}
         {file && status !== "loading" && (
           <button className="btn btn-ghost" onClick={reset}>
             Clear

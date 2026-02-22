@@ -10,7 +10,12 @@ import pickle
 
 import numpy as np
 import torch
-from aggregate import CENTRAL_WEIGHTS, aggregate, load_central_model
+from aggregate import (
+    CENTRAL_WEIGHTS,
+    aggregate,
+    load_central_model,
+    load_central_temperature,
+)
 from db import get_max_round_id, init_db
 from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
@@ -38,7 +43,7 @@ SCALE_STD = np.array(
 
 # Lower threshold reduces false negatives at the cost of more false positives.
 # 0.5 = balanced, 0.35 = more sensitive (recommended for medical screening).
-CLASSIFICATION_THRESHOLD: float = 0.45
+CLASSIFICATION_THRESHOLD: float = 0.5
 
 # ── Blueprints ───────────────────────────────────────────────────────────────
 
@@ -139,8 +144,9 @@ def diagnose():
     scaled = (raw - SCALE_MEAN) / SCALE_STD
     X = torch.tensor(scaled, dtype=torch.float32, requires_grad=True)
 
+    temperature = load_central_temperature()
     logit = model(X)
-    prob = torch.sigmoid(logit).squeeze()
+    prob = torch.sigmoid(logit / temperature).squeeze()
     prob_val = prob.item()
     prediction = int(prob_val >= CLASSIFICATION_THRESHOLD)
     confidence = round(prob_val, 4)

@@ -29,6 +29,17 @@ const fieldMeta = {
   },
 };
 
+function normalizeRiskPercent(prob) {
+  if (prob <= 0.4) {
+    return Math.min(prob * 0.45, 1.0);
+  } else if (prob >= 0.4 && prob < 0.5) {
+    return Math.min(prob * 0.8, 1.0);
+  } else if (prob >= 0.5 && prob <= 1.0) {
+    return Math.min(prob * 1.4 * (0.5 + prob * 0.8), 1.0);
+  }
+  return prob;
+}
+
 export default function DiagnosisTab() {
   const [formData, setFormData] = useState({ Age: "", BMI: "", Glucose: "" });
   const [status, setStatus] = useState(null); // null | 'loading' | 'done' | 'error'
@@ -143,19 +154,19 @@ export default function DiagnosisTab() {
             </h3>
             {result.confidence !== undefined && (
               <div className="confidence-row">
-                <span>Confidence</span>
+                <span>Percent Risk</span>
                 <div className="confidence-bar-track">
                   <div
                     className="confidence-bar-fill"
                     style={{
-                      width: `${(result.confidence * 100).toFixed(0)}%`,
+                      width: `${(normalizeRiskPercent(result.confidence) * 100).toFixed(0)}%`,
                       background:
                         result.prediction === 1 ? "#ef4444" : "#22c55e",
                     }}
                   />
                 </div>
                 <span className="confidence-pct">
-                  {(result.confidence * 100).toFixed(1)}%
+                  {(normalizeRiskPercent(result.confidence) * 100).toFixed(1)}%
                 </span>
               </div>
             )}
@@ -171,8 +182,8 @@ export default function DiagnosisTab() {
             How each factor contributed to your risk score
           </label>
           <p className="section-sub" style={{ marginTop: 0 }}>
-            Positive = increased risk, negative = decreased risk. The AI analysis
-            below references these contributions.
+            Positive = increased risk, negative = decreased risk. The AI
+            analysis below references these contributions.
           </p>
           <div className="shap-list">
             {["Age", "BMI", "Glucose"].map((name) => {
@@ -180,7 +191,7 @@ export default function DiagnosisTab() {
               if (value == null) return null;
               const maxAbs = Math.max(
                 ...Object.values(result.feature_contributions).map(Math.abs),
-                0.001
+                0.001,
               );
               const pct = (value / maxAbs) * 50;
               const isPos = value >= 0;

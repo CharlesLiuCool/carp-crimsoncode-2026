@@ -21,18 +21,81 @@ import io
 import logging
 import os
 
+import numpy as np
+import pandas as pd
 import torch
+import torch.nn as nn
 from db import fetch_all_valid_weights
 from key_pool import ROUND_SIZE
 from model import MergedModel
+from torch import optim
 
 logger = logging.getLogger(__name__)
 
 ARTIFACTS_DIR = os.path.join(os.path.dirname(__file__), "artifacts")
 CENTRAL_WEIGHTS = os.path.join(ARTIFACTS_DIR, "central_model.pt")
+CENTRAL_TEMPERATURE = os.path.join(ARTIFACTS_DIR, "central_temperature.pt")
+
+BACKEND_DIR = os.path.dirname(__file__)
+TEST_DATA_PATH = os.path.join(BACKEND_DIR, "test_data.csv")
+
+# Must match evaluate.py / main.py
+SCALE_MEAN = np.array(
+    [42.27461331040037, 27.344150779168032, 137.77024124847878], dtype=np.float32
+)
+SCALE_STD = np.array(
+    [22.51730211875095, 6.608171633655254, 40.57052832219186], dtype=np.float32
+)
 
 # Kept for backward-compatibility with weights.py import; value mirrors ROUND_SIZE.
 MIN_CONTRIBUTORS: int = ROUND_SIZE
+
+
+# ── Temperature calibration ───────────────────────────────────────────────────
+
+
+def _learn_temperature(model: MergedModel) -> float:
+    """
+    Fit a scalar temperature on the held-out test set via LBFGS so that
+    sigmoid(logit / T) produces well-calibrated probabilities.
+
+    Mirrors the same routine used by the hospital client after local training.
+    Falls back to T=1.0 if test_data.csv is unavailable.
+    """
+    if not os.path.isfile(TEST_DATA_PATH):
+        logger.warning(
+            "test_data.csv not found — skipping temperature calibration, T=1.0"
+        )
+        return 1.0
+
+    try:
+        df = pd.read_csv(TEST_DATA_PATH)
+        raw = df[["Age", "BMI", "Glucose"]].values.astype(np.float32)
+        X = torch.tensor((raw - SCALE_MEAN) / SCALE_STD, dtype=torch.float32)
+        y = torch.tensor(df["Outcome"].values.astype(np.float32)).unsqueeze(1)
+    except Exception as exc:
+        logger.warning("Temperature calibration skipped (data load error): %s", exc)
+        return 1.0
+
+    model.eval()
+    temperature = nn.Parameter(torch.ones(1))
+    opt = optim.LBFGS([temperature], lr=0.01, max_iter=200)
+    criterion = nn.BCEWithLogitsLoss()
+
+    with torch.no_grad():
+        logits = model(X).detach()
+
+    def step():
+        opt.zero_grad()
+        loss = criterion(logits / temperature, y)
+        loss.backward()
+        return loss
+
+    opt.step(step)
+    T = max(float(temperature.item()), 1e-3)
+    logger.info("Temperature calibration complete: T=%.4f", T)
+    return T
+
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -141,9 +204,16 @@ def aggregate() -> dict:
         stacked = torch.stack([sd[key].float() for sd in state_dicts], dim=0)
         avg_state[key] = stacked.mean(dim=0)
 
+    # ── Temperature calibration ───────────────────────────────────────────────
+    calibrated_model = MergedModel(dropout=0.0)
+    calibrated_model.load_state_dict(avg_state)
+    calibrated_model.eval()
+    temperature = _learn_temperature(calibrated_model)
+
     # ── Persist ──────────────────────────────────────────────────────────────
     os.makedirs(ARTIFACTS_DIR, exist_ok=True)
     torch.save(avg_state, CENTRAL_WEIGHTS)
+    torch.save(torch.tensor([temperature]), CENTRAL_TEMPERATURE)
 
     logger.info(
         "FedAvg complete: %d complete round(s), %d file(s) aggregated, "
@@ -161,6 +231,7 @@ def aggregate() -> dict:
         "complete_rounds": len(complete),
         "pending_rounds": len(pending),
         "central_model": CENTRAL_WEIGHTS,
+        "temperature": round(temperature, 4),
     }
 
 
@@ -185,3 +256,15 @@ def load_central_model() -> MergedModel:
     )
     model.eval()
     return model
+
+
+def load_central_temperature() -> float:
+    """
+    Load the calibrated temperature scalar for the central model.
+    Returns 1.0 (no-op) if the temperature file has not been saved yet.
+    """
+    if not os.path.isfile(CENTRAL_TEMPERATURE):
+        logger.warning("central_temperature.pt not found — using T=1.0 (uncalibrated)")
+        return 1.0
+    T = torch.load(CENTRAL_TEMPERATURE, map_location="cpu", weights_only=True)
+    return max(float(T.item()), 1e-3)
