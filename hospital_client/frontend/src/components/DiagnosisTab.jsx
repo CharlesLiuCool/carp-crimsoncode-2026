@@ -3,21 +3,40 @@ import { useState, useRef } from "react";
 import { parseCSV, validateColumns, DIAGNOSIS_COLUMNS } from "../utils/csv";
 import CSVPreview from "./CSVPreview";
 
+const fieldMeta = {
+  Age: {
+    label: "Age",
+    unit: "years",
+    min: 1,
+    max: 120,
+    step: 1,
+    placeholder: "45",
+  },
+  BMI: {
+    label: "BMI",
+    unit: "kg/m²",
+    min: 10,
+    max: 70,
+    step: 0.1,
+    placeholder: "28.5",
+  },
+  Glucose: {
+    label: "Glucose",
+    unit: "mg/dL",
+    min: 0,
+    max: 400,
+    step: 1,
+    placeholder: "120",
+  },
+};
+
 export default function DiagnosisTab() {
-  const [mode, setMode] = useState("form"); // 'form' | 'csv'
-  const [formData, setFormData] = useState({
-    Pregnancies: "",
-    Glucose: "",
-    BloodPressure: "",
-    Insulin: "",
-    BMI: "",
-    DiabetesPedigreeFunction: "",
-    Age: "",
-  });
+  const [mode, setMode] = useState("form");
+  const [formData, setFormData] = useState({ Age: "", BMI: "", Glucose: "" });
   const [file, setFile] = useState(null);
   const [parsed, setParsed] = useState(null);
   const [csvError, setCsvError] = useState("");
-  const [status, setStatus] = useState(null);
+  const [status, setStatus] = useState(null); // null | 'loading' | 'done' | 'error'
   const [result, setResult] = useState(null);
   const fileRef = useRef();
 
@@ -56,14 +75,21 @@ export default function DiagnosisTab() {
         res = await fetch("/api/diagnose", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(formData),
+          body: JSON.stringify({
+            Age: Number(formData.Age),
+            BMI: Number(formData.BMI),
+            Glucose: Number(formData.Glucose),
+          }),
         });
       } else {
         const fd = new FormData();
         fd.append("file", file);
-        res = await fetch("/api/diagnose", { method: "POST", body: fd });
+        res = await fetch("/api/diagnose/batch", { method: "POST", body: fd });
       }
-      if (!res.ok) throw new Error(`Server responded with ${res.status}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `Server responded with ${res.status}`);
+      }
       const data = await res.json();
       setStatus("done");
       setResult(data);
@@ -73,95 +99,75 @@ export default function DiagnosisTab() {
     }
   }
 
-  const fieldLabels = {
-    Pregnancies: {
-      label: "Pregnancies",
-      unit: "",
-      type: "number",
-      min: 0,
-      max: 20,
-    },
-    Glucose: {
-      label: "Glucose",
-      unit: "mg/dL",
-      type: "number",
-      min: 0,
-      max: 300,
-    },
-    BloodPressure: {
-      label: "Blood Pressure",
-      unit: "mmHg",
-      type: "number",
-      min: 0,
-      max: 200,
-    },
-    Insulin: {
-      label: "Insulin",
-      unit: "μU/mL",
-      type: "number",
-      min: 0,
-      max: 900,
-    },
-    BMI: {
-      label: "BMI",
-      unit: "kg/m²",
-      type: "number",
-      min: 0,
-      max: 70,
-      step: 0.1,
-    },
-    DiabetesPedigreeFunction: {
-      label: "Diabetes Pedigree Function",
-      unit: "",
-      type: "number",
-      min: 0,
-      max: 3,
-      step: 0.001,
-    },
-    Age: { label: "Age", unit: "years", type: "number", min: 1, max: 120 },
-  };
+  function reset() {
+    setFile(null);
+    setParsed(null);
+    setCsvError("");
+    setStatus(null);
+    setResult(null);
+    if (fileRef.current) fileRef.current.value = "";
+  }
+
+  // Single result (form mode)
+  const singleResult =
+    mode === "form" && status === "done" && result && !result.error
+      ? result
+      : null;
+
+  // Batch results (CSV mode)
+  const batchResults =
+    mode === "csv" && status === "done" && result?.results
+      ? result.results
+      : null;
 
   return (
     <div className="tab-content">
       <div className="section-header">
         <h2>Patient Diagnosis</h2>
         <p className="section-sub">
-          Submit patient data to the central model to receive a diabetes risk
-          assessment.
+          Submit patient data to receive a diabetes risk assessment from the
+          trained model. Requires Age, BMI, and fasting Glucose.
         </p>
       </div>
 
       <div className="mode-toggle">
         <button
           className={`mode-btn ${mode === "form" ? "active" : ""}`}
-          onClick={() => setMode("form")}
+          onClick={() => {
+            setMode("form");
+            reset();
+          }}
         >
           Manual Entry
         </button>
         <button
           className={`mode-btn ${mode === "csv" ? "active" : ""}`}
-          onClick={() => setMode("csv")}
+          onClick={() => {
+            setMode("csv");
+            reset();
+          }}
         >
           Upload CSV
         </button>
       </div>
 
+      {/* ── Manual entry form ── */}
       {mode === "form" && (
         <div className="card">
           <label className="card-label">Patient Information</label>
           <div className="form-grid">
             {DIAGNOSIS_COLUMNS.map((field) => {
-              const meta = fieldLabels[field];
+              const meta = fieldMeta[field];
               return (
                 <div className="form-field" key={field}>
                   <label>{meta.label}</label>
                   <div className="input-wrapper">
                     <input
-                      type={meta.type}
+                      type="number"
                       min={meta.min}
                       max={meta.max}
-                      step={meta.step || 1}
-                      placeholder="0"
+                      step={meta.step}
+                      placeholder={meta.placeholder}
                       value={formData[field]}
                       onChange={(e) => handleFormChange(field, e.target.value)}
                     />
@@ -174,6 +180,7 @@ export default function DiagnosisTab() {
         </div>
       )}
 
+      {/* ── CSV upload ── */}
       {mode === "csv" && (
         <div className="card">
           <label className="card-label">Patient CSV File</label>
@@ -206,8 +213,7 @@ export default function DiagnosisTab() {
                   className="remove-btn"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setFile(null);
-                    setParsed(null);
+                    reset();
                   }}
                 >
                   ✕
@@ -229,45 +235,90 @@ export default function DiagnosisTab() {
         </div>
       )}
 
-      {status === "done" && result && !result.error && (
+      {/* ── Single result ── */}
+      {singleResult && (
         <div
-          className={`result-card ${result.prediction === 1 ? "result-positive" : "result-negative"}`}
+          className={`result-card ${singleResult.prediction === 1 ? "result-positive" : "result-negative"}`}
         >
           <div className="result-body">
             <h3>
-              {result.prediction === 1
+              {singleResult.prediction === 1
                 ? "Diabetes Risk Detected"
-                : "No Diabetes Detected"}
+                : "No Diabetes Risk Detected"}
             </h3>
-            {result.confidence !== undefined && (
+            {singleResult.confidence !== undefined && (
               <div className="confidence-row">
                 <span>Confidence</span>
                 <div className="confidence-bar-track">
                   <div
                     className="confidence-bar-fill"
                     style={{
-                      width: `${(result.confidence * 100).toFixed(0)}%`,
+                      width: `${(singleResult.confidence * 100).toFixed(0)}%`,
                       background:
-                        result.prediction === 1 ? "#ef4444" : "#22c55e",
+                        singleResult.prediction === 1 ? "#ef4444" : "#22c55e",
                     }}
                   />
                 </div>
                 <span className="confidence-pct">
-                  {(result.confidence * 100).toFixed(1)}%
+                  {(singleResult.confidence * 100).toFixed(1)}%
                 </span>
               </div>
             )}
-            {result.message && <p className="result-msg">{result.message}</p>}
+            {singleResult.message && (
+              <p className="result-msg">{singleResult.message}</p>
+            )}
           </div>
         </div>
       )}
 
+      {/* ── Batch results ── */}
+      {batchResults && (
+        <div className="card">
+          <label className="card-label">
+            Batch Results —{" "}
+            <span className="preview-count">
+              {batchResults.length} patients
+            </span>
+          </label>
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Result</th>
+                  <th>Confidence</th>
+                  <th>Note</th>
+                </tr>
+              </thead>
+              <tbody>
+                {batchResults.map((r) => (
+                  <tr key={r.row}>
+                    <td>{r.row + 1}</td>
+                    <td
+                      style={{
+                        color: r.prediction === 1 ? "#ef4444" : "#22c55e",
+                        fontWeight: 600,
+                      }}
+                    >
+                      {r.prediction === 1 ? "At Risk" : "No Risk"}
+                    </td>
+                    <td>{(r.confidence * 100).toFixed(1)}%</td>
+                    <td>{r.message}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── Error ── */}
       {status === "error" && (
         <div className="alert alert-error">
           <span>❌</span>
           <div>
             <strong>Request Failed</strong>
-            <p>{result?.error || "Unable to reach the central server."}</p>
+            <p>{result?.error || "Unable to reach the diagnosis server."}</p>
           </div>
         </div>
       )}
@@ -290,6 +341,11 @@ export default function DiagnosisTab() {
             "Get Diagnosis"
           )}
         </button>
+        {status === "done" && (
+          <button className="btn btn-ghost" onClick={reset}>
+            Clear
+          </button>
+        )}
       </div>
     </div>
   );
