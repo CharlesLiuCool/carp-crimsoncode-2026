@@ -310,8 +310,8 @@ def load_model_for_inference(use_dp: bool = False):
     Load MergedModel + temperature from artifacts/.
     Returns (model, temperature, scaler).
     """
-    weights_file = "dp_weights.pt" if use_dp else "weights.pt"
-    temp_file = "dp_temperature.pt" if use_dp else "temperature.pt"
+    weights_file = "dp_weights.pt"
+    temp_file = "dp_temperature.pt"
 
     weights_path = os.path.join(ARTIFACTS_DIR, weights_file)
     temp_path = os.path.join(ARTIFACTS_DIR, temp_file)
