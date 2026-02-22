@@ -34,6 +34,9 @@ export default function DiagnosisTab() {
   const [status, setStatus] = useState(null); // null | 'loading' | 'done' | 'error'
   const [result, setResult] = useState(null);
   const [exportError, setExportError] = useState(null);
+  const [guidanceLoading, setGuidanceLoading] = useState(false);
+  const [guidanceError, setGuidanceError] = useState(null);
+  const [guidance, setGuidance] = useState(null); // { analysis, analysis_provider }
 
   const formComplete = DIAGNOSIS_COLUMNS.every((k) => formData[k] !== "");
 
@@ -46,6 +49,38 @@ export default function DiagnosisTab() {
     setStatus(null);
     setResult(null);
     setExportError(null);
+    setGuidance(null);
+    setGuidanceError(null);
+  }
+
+  async function handleGenerateGuidance() {
+    if (!result || result.error) return;
+    setGuidanceError(null);
+    setGuidanceLoading(true);
+    try {
+      const res = await fetch("/api/diagnose/guidance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          Age: Number(formData.Age),
+          BMI: Number(formData.BMI),
+          Glucose: Number(formData.Glucose),
+          prediction: result.prediction,
+          confidence: result.confidence,
+          feature_contributions: result.feature_contributions || {},
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `Server responded with ${res.status}`);
+      }
+      const data = await res.json();
+      setGuidance({ analysis: data.analysis, analysis_provider: data.analysis_provider });
+    } catch (err) {
+      setGuidanceError(err.message || "Failed to generate AI guidance.");
+    } finally {
+      setGuidanceLoading(false);
+    }
   }
 
   async function handleExportModel() {
@@ -209,8 +244,8 @@ export default function DiagnosisTab() {
         </div>
       )}
 
-      {/* ── LLM Analysis ── */}
-      {status === "done" && result?.analysis && (
+      {/* ── LLM Analysis (from initial diagnosis) ── */}
+      {status === "done" && result?.analysis && !guidance && (
         <div className="card">
           <label className="card-label">
             AI Clinical Analysis
@@ -244,6 +279,50 @@ export default function DiagnosisTab() {
             For informational purposes only — not a substitute for clinical
             judgement.
           </p>
+        </div>
+      )}
+
+      {/* ── AI health guidance (on-demand) ── */}
+      {guidance && (
+        <div className="card">
+          <label className="card-label">
+            AI health guidance
+            {guidance.analysis_provider && (
+              <span className="preview-count">
+                {" "}
+                — {guidance.analysis_provider}
+              </span>
+            )}
+          </label>
+          <p
+            style={{
+              fontSize: "0.875rem",
+              color: "var(--gray-700)",
+              lineHeight: 1.7,
+              whiteSpace: "pre-wrap",
+            }}
+          >
+            {guidance.analysis}
+          </p>
+          <p
+            style={{
+              fontSize: "0.72rem",
+              color: "var(--gray-400)",
+              marginTop: 8,
+            }}
+          >
+            For informational purposes only — not a substitute for clinical
+            judgement.
+          </p>
+        </div>
+      )}
+
+      {guidanceError && (
+        <div className="alert alert-error">
+          <div>
+            <strong>AI guidance failed</strong>
+            <p>{guidanceError}</p>
+          </div>
         </div>
       )}
 
@@ -288,6 +367,23 @@ export default function DiagnosisTab() {
         >
           Export model
         </button>
+        {status === "done" && result && !result.error && (
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={handleGenerateGuidance}
+            disabled={guidanceLoading}
+            title="Generate AI health guidance using Groq/Gemini"
+          >
+            {guidanceLoading ? (
+              <>
+                <span className="spinner" style={{ width: 14, height: 14 }} /> Generating...
+              </>
+            ) : (
+              "Generate AI health guidance"
+            )}
+          </button>
+        )}
         {status === "done" && (
           <button className="btn btn-ghost" onClick={reset}>
             Clear

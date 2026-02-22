@@ -179,11 +179,22 @@ def analyse_diagnosis(
         feature_contributions=feature_contributions,
     )
 
+    has_groq = bool(os.environ.get("GROQ_API_KEY"))
+    has_gemini = bool(os.environ.get("GEMINI_API_KEY"))
+    if not has_groq and not has_gemini:
+        raise RuntimeError(
+            "AI guidance is not configured. Set at least one of GROQ_API_KEY or GEMINI_API_KEY. "
+            "When using Docker, set them in the project root .env; when running the server directly, "
+            "use server/backend/.env. See server/backend/.env.example."
+        )
+
+    groq_err = None
     try:
         result = _try_groq(prompt)
         logger.info("Clinical analysis generated via Groq.")
         return result, "Groq (Llama 3.3 70B)"
     except Exception as groq_exc:
+        groq_err = str(groq_exc)
         logger.warning("Groq failed (%s), trying Gemini fallback.", groq_exc)
 
     try:
@@ -193,5 +204,5 @@ def analyse_diagnosis(
     except Exception as gemini_exc:
         logger.warning("Gemini fallback also failed: %s", gemini_exc)
         raise RuntimeError(
-            f"All LLM providers failed. Groq: {groq_exc}. Gemini: {gemini_exc}."
+            f"All LLM providers failed. Groq: {groq_err or 'unknown'}. Gemini: {gemini_exc}."
         )
