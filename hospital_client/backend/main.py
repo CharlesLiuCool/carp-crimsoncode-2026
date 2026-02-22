@@ -16,7 +16,7 @@ from hospital_client.backend.train import (
 
 # ─── App ──────────────────────────────────────────────────────────────────────
 app = Flask(__name__)
-CORS(app, origins=["http://localhost:5173", "http://127.0.0.1:5173"])
+CORS(app, origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:8081", "http://127.0.0.1:8081", "http://localhost", "http://127.0.0.1"])
 
 ARTIFACTS_DIR = os.path.join(os.path.dirname(__file__), "artifacts")
 MERGED_CSV = os.path.join(os.path.dirname(__file__), "..", "merged_diabetes.csv")
@@ -132,8 +132,18 @@ def diagnose_json():
             glucose=float(data["Glucose"]),
             use_dp=False,
         )
-    except FileNotFoundError as e:
-        return jsonify({"detail": str(e)}), 503
+    except FileNotFoundError:
+        try:
+            result = predict_single(
+                age=float(data["Age"]),
+                bmi=float(data["BMI"]),
+                glucose=float(data["Glucose"]),
+                use_dp=True,
+            )
+        except FileNotFoundError as e:
+            return jsonify({"detail": str(e)}), 503
+        except Exception as e:
+            return jsonify({"detail": str(e)}), 500
     except Exception as e:
         return jsonify({"detail": str(e)}), 500
 
@@ -169,8 +179,13 @@ def diagnose_csv():
 
     try:
         results = predict_batch(df, use_dp=False)
-    except FileNotFoundError as e:
-        return jsonify({"detail": str(e)}), 503
+    except FileNotFoundError:
+        try:
+            results = predict_batch(df, use_dp=True)
+        except FileNotFoundError as e:
+            return jsonify({"detail": str(e)}), 503
+        except Exception as e:
+            return jsonify({"detail": str(e)}), 500
     except Exception as e:
         return jsonify({"detail": str(e)}), 500
 
