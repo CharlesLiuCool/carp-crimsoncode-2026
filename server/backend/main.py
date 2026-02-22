@@ -10,7 +10,7 @@ import pickle
 
 import numpy as np
 import torch
-from aggregate import aggregate, load_central_model
+from aggregate import CENTRAL_WEIGHTS, aggregate, load_central_model
 from db import get_max_round_id, init_db
 from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
@@ -194,13 +194,13 @@ def export_model():
     """
     if not os.path.isfile(CENTRAL_WEIGHTS):
         return jsonify(
-            {"detail": "Central model not found. Upload at least one weight file first."}
+            {
+                "detail": "Central model not found. Upload at least one weight file first."
+            }
         ), 404
 
     try:
-        state_dict = torch.load(
-            CENTRAL_WEIGHTS, map_location="cpu", weights_only=True
-        )
+        state_dict = torch.load(CENTRAL_WEIGHTS, map_location="cpu", weights_only=True)
         buf = io.BytesIO()
         pickle.dump(state_dict, buf, protocol=pickle.HIGHEST_PROTOCOL)
         buf.seek(0)
