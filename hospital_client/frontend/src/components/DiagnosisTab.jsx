@@ -2,6 +2,13 @@ import "../App.css";
 import { useState } from "react";
 import { DIAGNOSIS_COLUMNS } from "../utils/csv";
 
+// Central server base URL for diagnosis (uses aggregated model). Set in .env as VITE_CENTRAL_SERVER_URL.
+const CENTRAL_SERVER_URL = (import.meta.env.VITE_CENTRAL_SERVER_URL || "").replace(/\/$/, "");
+
+function getDiagnoseUrl() {
+  return CENTRAL_SERVER_URL ? `${CENTRAL_SERVER_URL}/api/diagnose` : "/api/diagnose";
+}
+
 const fieldMeta = {
   Age: {
     label: "Age",
@@ -50,7 +57,7 @@ export default function DiagnosisTab() {
     setStatus("loading");
     setResult(null);
     try {
-      const res = await fetch("/api/diagnose", {
+      const res = await fetch(getDiagnoseUrl(), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
