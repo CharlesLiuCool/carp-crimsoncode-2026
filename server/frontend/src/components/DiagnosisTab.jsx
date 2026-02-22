@@ -33,6 +33,7 @@ export default function DiagnosisTab() {
   const [formData, setFormData] = useState({ Age: "", BMI: "", Glucose: "" });
   const [status, setStatus] = useState(null); // null | 'loading' | 'done' | 'error'
   const [result, setResult] = useState(null);
+  const [exportError, setExportError] = useState(null);
 
   const formComplete = DIAGNOSIS_COLUMNS.every((k) => formData[k] !== "");
 
@@ -44,6 +45,27 @@ export default function DiagnosisTab() {
     setFormData({ Age: "", BMI: "", Glucose: "" });
     setStatus(null);
     setResult(null);
+    setExportError(null);
+  }
+
+  async function handleExportModel() {
+    setExportError(null);
+    try {
+      const res = await fetch("/api/model/export");
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `Export failed (${res.status})`);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "carp_central_model.pkl";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setExportError(err.message || "Failed to export model.");
+    }
   }
 
   async function handleSubmit() {
@@ -180,6 +202,15 @@ export default function DiagnosisTab() {
         </div>
       )}
 
+      {exportError && (
+        <div className="alert alert-error">
+          <div>
+            <strong>Export failed</strong>
+            <p>{exportError}</p>
+          </div>
+        </div>
+      )}
+
       {/* ── Error ── */}
       {status === "error" && (
         <div className="alert alert-error">
@@ -203,6 +234,14 @@ export default function DiagnosisTab() {
           ) : (
             "Get Diagnosis"
           )}
+        </button>
+        <button
+          type="button"
+          className="btn btn-ghost"
+          onClick={handleExportModel}
+          title="Download aggregated central model as .pkl"
+        >
+          Export model
         </button>
         {status === "done" && (
           <button className="btn btn-ghost" onClick={reset}>

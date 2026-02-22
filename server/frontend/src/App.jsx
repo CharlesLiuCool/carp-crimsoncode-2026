@@ -1,6 +1,7 @@
 import { useState } from "react";
 import "./App.css";
 import DiagnosisTab from "./components/DiagnosisTab";
+import UploadLogTab from "./components/UploadLogTab";
 import WeightsTab from "./components/WeightsTab";
 
 // Add new tab labels here as the server frontend grows.
@@ -8,7 +9,7 @@ import WeightsTab from "./components/WeightsTab";
 const TABS = [
   { label: "Patient Diagnosis", component: <DiagnosisTab /> },
   { label: "Upload Weights", component: <WeightsTab /> },
-  // { label: "Analytics",      component: <AnalyticsTab /> },
+  { label: "Hospital Upload Log", component: <UploadLogTab /> },
 ];
 
 export default function App() {
@@ -64,6 +65,9 @@ export default function App() {
               </p>
               <p>
                 <strong>Upload Weights:</strong> Hospital clients train locally with DP and export their weights. Upload those <code>.pt</code> files here. The server averages all uploaded weights and updates the central model so diagnosis uses the latest combined model.
+              </p>
+              <p>
+                <strong>Hospital Upload Log:</strong> View a clean log of all hospital weight files that have been uploaded and are included in the central model.
               </p>
             </div>
           </div>
