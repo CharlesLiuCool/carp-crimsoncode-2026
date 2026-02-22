@@ -16,6 +16,14 @@ uploaded_weights
     weights     BYTEA NOT NULL         -- raw masked .pt file bytes
     round_id    INTEGER                -- which aggregation round this upload belongs to
     slot        INTEGER                -- slot within the round (1, 2, or 3)
+
+metrics_history
+    id             SERIAL PRIMARY KEY
+    recorded_at    TIMESTAMPTZ DEFAULT now()
+    accuracy       FLOAT NOT NULL
+    precision      FLOAT NOT NULL
+    recall         FLOAT NOT NULL
+    f1             FLOAT NOT NULL
 """
 
 import io
@@ -42,6 +50,15 @@ CREATE TABLE IF NOT EXISTS uploaded_weights (
     weights     BYTEA NOT NULL,
     round_id    INTEGER,
     slot        INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS metrics_history (
+    id          SERIAL PRIMARY KEY,
+    recorded_at TIMESTAMPTZ DEFAULT now(),
+    accuracy    FLOAT NOT NULL,
+    precision   FLOAT NOT NULL,
+    recall      FLOAT NOT NULL,
+    f1          FLOAT NOT NULL
 );
 """
 
@@ -266,3 +283,44 @@ def get_max_round_id() -> int | None:
             )
             row = cur.fetchone()
     return int(row[0]) if row and row[0] is not None else None
+
+
+def insert_metrics_history(accuracy: float, precision: float, recall: float, f1: float) -> None:
+    """Append one row after a successful aggregation + evaluate(). Used for upload log graph."""
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO metrics_history (accuracy, precision, recall, f1)
+                VALUES (%s, %s, %s, %s)
+                """,
+                (accuracy, precision, recall, f1),
+            )
+        conn.commit()
+
+
+def get_metrics_history(limit: int = 3) -> list[dict]:
+    """Return the most recent metrics rows (newest first). Used for the upload log graph."""
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT id, recorded_at, accuracy, precision, recall, f1
+                FROM metrics_history
+                ORDER BY recorded_at DESC
+                LIMIT %s
+                """,
+                (limit,),
+            )
+            rows = cur.fetchall()
+    return [
+        {
+            "id": r[0],
+            "recorded_at": r[1].isoformat() if r[1] else None,
+            "accuracy": r[2],
+            "precision": r[3],
+            "recall": r[4],
+            "f1": r[5],
+        }
+        for r in rows
+    ]

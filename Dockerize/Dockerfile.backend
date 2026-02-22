@@ -11,11 +11,11 @@ COPY requirements-project.txt /app/requirements-project.txt
 RUN pip install --no-cache-dir -r /app/requirements-project.txt
 
 # App package and optional data (scaler can be built from merged_diabetes.csv on first run)
-COPY hospital_client/__init__.py /app/hospital_client/
 COPY hospital_client/backend /app/hospital_client/backend
-COPY hospital_client/merged_diabetes.csv /app/hospital_client/merged_diabetes.csv
+COPY hospital_client/hospital_csvs/merged_diabetes.csv /app/hospital_client/merged_diabetes.csv
 
-RUN mkdir -p /app/hospital_client/backend/artifacts
+RUN mkdir -p /app/hospital_client/backend/artifacts && \
+    touch /app/hospital_client/__init__.py
 
 ENV PYTHONPATH=/app
 EXPOSE 8000

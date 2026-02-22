@@ -26,10 +26,10 @@ node_modules
 **/npm-debug.log
 
 # Allow merged_diabetes.csv for backend image (scaler build on first run)
-# Ignore other large CSVs
 hospital_client/diabetes*.csv
 hospital_client/synthetic*.csv
-hospital_client/hospital_csvs
+hospital_client/hospital_csvs/*
+!hospital_client/hospital_csvs/merged_diabetes.csv
 *.pt
 *.pkl
 !hospital_client/backend/artifacts/scale_params.json

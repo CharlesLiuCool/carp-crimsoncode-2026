@@ -3,7 +3,9 @@ import os
 
 from dotenv import load_dotenv
 
+# Local: server/backend/.env. Docker: project root .env is mounted at /app/.env
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
+load_dotenv("/app/.env")
 
 import io
 import pickle
@@ -75,6 +77,11 @@ def startup():
     except Exception as exc:
         app.logger.error("KeyPool init failed: %s", exc)
 
+    if os.environ.get("GROQ_API_KEY") or os.environ.get("GEMINI_API_KEY"):
+        app.logger.info("AI guidance configured.")
+    else:
+        app.logger.warning("AI guidance not configured: set GROQ_API_KEY or GEMINI_API_KEY in project root .env when using Docker.")
+
     try:
         result = aggregate()
         app.logger.info(
@@ -97,6 +104,9 @@ def health():
         {
             "status": "ok",
             "central_model": os.path.isfile(CENTRAL_WEIGHTS),
+            "ai_guidance_configured": bool(
+                os.environ.get("GROQ_API_KEY") or os.environ.get("GEMINI_API_KEY")
+            ),
         }
     )
 
@@ -191,6 +201,51 @@ def diagnose():
         response["analysis_provider"] = analysis_provider
 
     return jsonify(response)
+
+
+# ── Generate AI health guidance (on-demand, uses gemini.py) ────────────────────
+
+
+@app.post("/api/diagnose/guidance")
+def diagnose_guidance():
+    """
+    Generate AI health guidance for a patient using the same LLM as diagnosis.
+    Request body: { "Age", "BMI", "Glucose", "prediction", "confidence", "feature_contributions" }
+    (prediction, confidence, feature_contributions typically from a prior /api/diagnose response).
+    """
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"detail": "JSON body required."}), 400
+
+    missing = [f for f in ["Age", "BMI", "Glucose"] if f not in data]
+    if missing:
+        return jsonify({"detail": f"Missing fields: {missing}"}), 400
+
+    try:
+        age = float(data["Age"])
+        bmi = float(data["BMI"])
+        glucose = float(data["Glucose"])
+    except (TypeError, ValueError):
+        return jsonify({"detail": "Age, BMI, and Glucose must be numbers."}), 400
+
+    prediction = data.get("prediction", 0)
+    confidence = float(data.get("confidence", 0.0))
+    feature_contributions = data.get("feature_contributions") or {}
+
+    try:
+        analysis, analysis_provider = analyse_diagnosis(
+            age=age,
+            bmi=bmi,
+            glucose=glucose,
+            prediction=int(prediction),
+            confidence=confidence,
+            feature_contributions=feature_contributions,
+        )
+    except Exception as exc:
+        app.logger.warning("AI guidance failed: %s", exc)
+        return jsonify({"detail": str(exc)}), 500
+
+    return jsonify({"analysis": analysis, "analysis_provider": analysis_provider})
 
 
 # ── Export central model ──────────────────────────────────────────────────────
