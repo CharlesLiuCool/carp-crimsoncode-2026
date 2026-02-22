@@ -5,11 +5,14 @@ from dotenv import load_dotenv
 
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
+import io
+import pickle
+
 import numpy as np
 import torch
-from aggregate import aggregate, load_central_model
+from aggregate import CENTRAL_WEIGHTS, aggregate, load_central_model
 from db import init_db
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
 from gemini import analyse_diagnosis
 from weights import weights_bp
@@ -159,6 +162,39 @@ def diagnose():
         response["analysis_provider"] = analysis_provider
 
     return jsonify(response)
+
+
+# ── Export central model ──────────────────────────────────────────────────────
+
+
+@app.get("/api/model/export")
+def export_model():
+    """
+    Download the aggregated central model as a .pkl file (state_dict).
+    Same idea as the hospital client's Export DP Weights, but for the central model.
+    """
+    if not os.path.isfile(CENTRAL_WEIGHTS):
+        return jsonify(
+            {"detail": "Central model not found. Upload at least one weight file first."}
+        ), 404
+
+    try:
+        state_dict = torch.load(
+            CENTRAL_WEIGHTS, map_location="cpu", weights_only=True
+        )
+        buf = io.BytesIO()
+        pickle.dump(state_dict, buf, protocol=pickle.HIGHEST_PROTOCOL)
+        buf.seek(0)
+    except Exception as exc:
+        app.logger.exception("Export model failed")
+        return jsonify({"detail": str(exc)}), 500
+
+    return send_file(
+        buf,
+        mimetype="application/octet-stream",
+        as_attachment=True,
+        download_name="carp_central_model.pkl",
+    )
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
