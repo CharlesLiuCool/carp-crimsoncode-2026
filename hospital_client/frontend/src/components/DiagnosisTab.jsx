@@ -130,27 +130,6 @@ export default function DiagnosisTab() {
         </p>
       </div>
 
-      <div className="mode-toggle">
-        <button
-          className={`mode-btn ${mode === "form" ? "active" : ""}`}
-          onClick={() => {
-            setMode("form");
-            reset();
-          }}
-        >
-          Manual Entry
-        </button>
-        <button
-          className={`mode-btn ${mode === "csv" ? "active" : ""}`}
-          onClick={() => {
-            setMode("csv");
-            reset();
-          }}
-        >
-          Upload CSV
-        </button>
-      </div>
-
       {/* ── Manual entry form ── */}
       {mode === "form" && (
         <div className="card">
@@ -177,61 +156,6 @@ export default function DiagnosisTab() {
               );
             })}
           </div>
-        </div>
-      )}
-
-      {/* ── CSV upload ── */}
-      {mode === "csv" && (
-        <div className="card">
-          <label className="card-label">Patient CSV File</label>
-          <div
-            className={`dropzone ${file ? "dropzone-active" : ""}`}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => {
-              e.preventDefault();
-              handleFile(e.dataTransfer.files[0]);
-            }}
-            onClick={() => fileRef.current.click()}
-          >
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".csv"
-              style={{ display: "none" }}
-              onChange={(e) => handleFile(e.target.files[0])}
-            />
-            {file ? (
-              <div className="dropzone-file">
-                <span className="file-icon">📄</span>
-                <div>
-                  <p className="file-name">{file.name}</p>
-                  <p className="file-size">
-                    {(file.size / 1024).toFixed(1)} KB
-                  </p>
-                </div>
-                <button
-                  className="remove-btn"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    reset();
-                  }}
-                >
-                  ✕
-                </button>
-              </div>
-            ) : (
-              <div className="dropzone-empty">
-                <p className="dropzone-text">
-                  Drag & drop CSV, or <span className="link">browse</span>
-                </p>
-                <p className="dropzone-hint">
-                  Columns: {DIAGNOSIS_COLUMNS.join(", ")}
-                </p>
-              </div>
-            )}
-          </div>
-          {csvError && <p className="error-msg">{csvError}</p>}
-          {parsed && <CSVPreview headers={parsed.headers} rows={parsed.rows} />}
         </div>
       )}
 
@@ -267,47 +191,6 @@ export default function DiagnosisTab() {
             {singleResult.message && (
               <p className="result-msg">{singleResult.message}</p>
             )}
-          </div>
-        </div>
-      )}
-
-      {/* ── Batch results ── */}
-      {batchResults && (
-        <div className="card">
-          <label className="card-label">
-            Batch Results —{" "}
-            <span className="preview-count">
-              {batchResults.length} patients
-            </span>
-          </label>
-          <div className="table-scroll">
-            <table>
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Result</th>
-                  <th>Confidence</th>
-                  <th>Note</th>
-                </tr>
-              </thead>
-              <tbody>
-                {batchResults.map((r) => (
-                  <tr key={r.row}>
-                    <td>{r.row + 1}</td>
-                    <td
-                      style={{
-                        color: r.prediction === 1 ? "#ef4444" : "#22c55e",
-                        fontWeight: 600,
-                      }}
-                    >
-                      {r.prediction === 1 ? "At Risk" : "No Risk"}
-                    </td>
-                    <td>{(r.confidence * 100).toFixed(1)}%</td>
-                    <td>{r.message}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
         </div>
       )}
