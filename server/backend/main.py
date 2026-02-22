@@ -133,16 +133,24 @@ def diagnose():
     # Standardise features using the shared scaler parameters
     raw = np.array([[age, bmi, glucose]], dtype=np.float32)
     scaled = (raw - SCALE_MEAN) / SCALE_STD
-    X = torch.tensor(scaled)
+    X = torch.tensor(scaled, dtype=torch.float32, requires_grad=True)
 
-    with torch.no_grad():
-        logit = model(X)
-        prob = torch.sigmoid(logit).item()
+    logit = model(X)
+    prob = torch.sigmoid(logit).squeeze()
+    prob_val = prob.item()
+    prediction = int(prob_val >= 0.5)
+    confidence = round(prob_val, 4)
 
-    prediction = int(prob >= 0.5)
-    confidence = round(prob, 4)
+    # SHAP-style feature contributions: gradient of prob w.r.t. input × input (gradient × input attribution)
+    model.zero_grad()
+    prob.backward()
+    grad = X.grad.detach().numpy().squeeze()
+    x_np = X.detach().numpy().squeeze()
+    contrib_raw = (grad * x_np).tolist()
+    feature_names = ["Age", "BMI", "Glucose"]
+    feature_contributions = dict(zip(feature_names, [round(c, 4) for c in contrib_raw]))
 
-    # ── LLM analysis ─────────────────────────────────────────────────────────
+    # ── LLM analysis (includes feature contributions in prompt) ───────────────
     analysis = None
     analysis_provider = None
     try:
@@ -152,6 +160,7 @@ def diagnose():
             glucose=glucose,
             prediction=prediction,
             confidence=confidence,
+            feature_contributions=feature_contributions,
         )
     except Exception as exc:
         app.logger.warning("LLM analysis failed: %s", exc)
@@ -159,6 +168,7 @@ def diagnose():
     response = {
         "prediction": prediction,
         "confidence": confidence,
+        "feature_contributions": feature_contributions,
         "message": (
             "Elevated diabetes risk detected. Please consult a physician."
             if prediction == 1

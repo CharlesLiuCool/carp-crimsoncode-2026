@@ -115,6 +115,13 @@
     object-fit: contain;
     display: block;
 }
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.header-icon-btn,
 .header-help-btn {
     width: 36px;
     height: 36px;
@@ -131,6 +138,7 @@
     transition: background 0.2s, border-color 0.2s;
 }
 
+.header-icon-btn:hover,
 .header-help-btn:hover {
     background: rgba(255, 255, 255, 0.25);
     border-color: rgba(255, 255, 255, 0.6);
@@ -749,6 +757,70 @@ tr:hover td {
     color: var(--red-700);
 }
 
+/* ─── SHAP / Feature contributions ───────────────────────────────────── */
+.shap-card .section-sub {
+    font-size: 0.8rem;
+    color: var(--gray-500);
+}
+
+.shap-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.shap-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.shap-label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--gray-700);
+    min-width: 64px;
+}
+
+.shap-bar-track {
+    flex: 1;
+    height: 10px;
+    background: var(--gray-200);
+    border-radius: 4px;
+    position: relative;
+}
+
+.shap-bar {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    border-radius: 4px;
+    min-width: 2px;
+}
+
+.shap-bar-pos {
+    background: var(--red-500);
+}
+
+.shap-bar-neg {
+    background: var(--green-500);
+}
+
+.shap-value {
+    font-size: 0.8rem;
+    font-weight: 600;
+    min-width: 52px;
+    text-align: right;
+}
+
+.shap-value-pos {
+    color: var(--red-700);
+}
+
+.shap-value-neg {
+    color: var(--green-700);
+}
+
 /* ─── Action Row ─────────────────────────────────────────────────────── */
 .action-row {
     display: flex;
@@ -1011,4 +1083,206 @@ tr:hover td {
     .btn {
         justify-content: center;
     }
+}
+
+/* ─── Dark mode ─────────────────────────────────────────────────────── */
+.app.dark {
+    color: #e2e8f0;
+    background: #0f172a;
+}
+
+.app.dark .main {
+    background: #0f172a;
+}
+
+.app.dark .section-header h2,
+.app.dark .card-label,
+.app.dark .help-modal-header h2,
+.app.dark .help-modal-body h3 {
+    color: #f1f5f9;
+}
+
+.app.dark .section-sub,
+.app.dark .help-modal-body p {
+    color: #94a3b8;
+}
+
+.app.dark .card {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+.app.dark .tabs {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+.app.dark .tab-btn {
+    color: #94a3b8;
+}
+
+.app.dark .tab-btn:hover:not(.tab-active) {
+    background: #334155;
+    color: #cbd5e1;
+}
+
+.app.dark .tab-active {
+    background: #334155;
+    color: #93c5fd;
+}
+
+.app.dark .help-modal {
+    background: #1e293b;
+    border: 1px solid #334155;
+}
+
+.app.dark .help-modal-header {
+    border-bottom-color: #334155;
+}
+
+.app.dark .help-modal-body code {
+    background: #334155;
+    color: #e2e8f0;
+}
+
+.app.dark .help-close {
+    background: #334155;
+    color: #94a3b8;
+}
+
+.app.dark .help-close:hover {
+    background: #475569;
+    color: #f1f5f9;
+}
+
+.app.dark .dropzone {
+    background: #1e293b;
+    border-color: #475569;
+}
+
+.app.dark .dropzone:hover,
+.app.dark .dropzone-active {
+    border-color: #3b82f6;
+    background: #1e3a8a;
+}
+
+.app.dark .dropzone-text {
+    color: #cbd5e1;
+}
+
+.app.dark .dropzone-hint {
+    color: #64748b;
+}
+
+.app.dark .input-wrapper {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+.app.dark .input-wrapper input {
+    background: #1e293b;
+    color: #f1f5f9;
+    border-color: #334155;
+}
+
+.app.dark .input-wrapper:focus-within {
+    border-color: #3b82f6;
+}
+
+.app.dark .form-field label {
+    color: #94a3b8;
+}
+
+.app.dark .alert-success {
+    background: #14532d;
+    border-color: #166534;
+    color: #bbf7d0;
+}
+
+.app.dark .alert-error {
+    background: #450a0a;
+    border-color: #991b1b;
+    color: #fecaca;
+}
+
+.app.dark .alert-warning {
+    background: #422006;
+    border-color: #854d0e;
+    color: #fef08a;
+}
+
+.app.dark .table-scroll {
+    border-color: #334155;
+}
+
+.app.dark thead tr {
+    background: #1e293b;
+}
+
+.app.dark th {
+    color: #94a3b8;
+    border-bottom-color: #334155;
+}
+
+.app.dark td {
+    color: #e2e8f0;
+    border-bottom-color: #334155;
+}
+
+.app.dark tr:hover td {
+    background: #334155;
+}
+
+.app.dark .table-more {
+    background: #1e293b;
+    color: #64748b;
+    border-top-color: #334155;
+}
+
+.app.dark .result-card {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+.app.dark .result-card h3 {
+    color: #f1f5f9;
+}
+
+.app.dark .btn-ghost {
+    color: #94a3b8;
+    border-color: #334155;
+}
+
+.app.dark .btn-ghost:hover {
+    background: #334155;
+    color: #f1f5f9;
+}
+
+.app.dark .error-msg {
+    color: #fca5a5;
+}
+
+.app.dark .file-name,
+.app.dark code {
+    color: #e2e8f0;
+}
+
+.app.dark .shap-card .section-sub {
+    color: #94a3b8;
+}
+
+.app.dark .shap-label {
+    color: #cbd5e1;
+}
+
+.app.dark .shap-bar-track {
+    background: #334155;
+}
+
+.app.dark .shap-value-pos {
+    color: #fca5a5;
+}
+
+.app.dark .shap-value-neg {
+    color: #86efac;
 }
