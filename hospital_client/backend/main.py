@@ -22,6 +22,9 @@ ARTIFACTS_DIR = os.path.join(os.path.dirname(__file__), "artifacts")
 MERGED_CSV = os.path.join(os.path.dirname(__file__), "..", "merged_diabetes.csv")
 SCALER_PATH = os.path.join(ARTIFACTS_DIR, "scaler.pkl")
 
+# Minimum number of rows to avoid a "dataset too small" warning (training still runs)
+MIN_SAMPLES_WARNING = 50
+
 # ─── Startup: ensure scaler exists ───────────────────────────────────────────
 with app.app_context():
     if not os.path.isfile(SCALER_PATH):
@@ -86,6 +89,14 @@ def train_endpoint():
             }
         ), 400
 
+    n_rows = len(df_check)
+    warning = None
+    if n_rows < MIN_SAMPLES_WARNING:
+        warning = (
+            f"Dataset is very small ({n_rows} rows). "
+            f"Results may be unreliable. Consider using at least {MIN_SAMPLES_WARNING} samples."
+        )
+
     with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
         tmp.write(contents)
         tmp_path = tmp.name
@@ -106,7 +117,10 @@ def train_endpoint():
         else "Model trained successfully with no differential privacy."
     )
 
-    return jsonify({"message": message, **result})
+    response = {"message": message, **result}
+    if warning:
+        response["warning"] = warning
+    return jsonify(response)
 
 
 # ─── Diagnose (single patient JSON) ──────────────────────────────────────────
