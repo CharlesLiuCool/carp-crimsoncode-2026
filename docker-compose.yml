@@ -1,5 +1,5 @@
 services:
-  # ─── Hospital client ───────────────────────────────────────────────────────
+  # ─── Hospital client (no database) ──────────────────────────────────────────
   backend:
     build:
       context: .
@@ -25,22 +25,41 @@ services:
       backend:
         condition: service_healthy
 
-  # ─── Central CARP server ───────────────────────────────────────────────────
+  # ─── Central CARP server (PostgreSQL for weights) ───────────────────────────
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-carp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-carp}
+      POSTGRES_DB: ${POSTGRES_DB:-carp}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-carp} -d ${POSTGRES_DB:-carp}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
   server_backend:
     build:
       context: .
       dockerfile: Dockerfile.server-backend
     ports:
       - "8001:8001"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-carp}:${POSTGRES_PASSWORD:-carp}@db:5432/${POSTGRES_DB:-carp}
     volumes:
-      - server_uploaded_weights:/app/uploaded_weights
       - server_artifacts:/app/artifacts
+    depends_on:
+      db:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/api/health')"]
       interval: 10s
       timeout: 5s
       retries: 3
-      start_period: 10s
+      start_period: 15s
 
   server_frontend:
     build:
@@ -54,5 +73,5 @@ services:
 
 volumes:
   backend_artifacts:
-  server_uploaded_weights:
+  postgres_data:
   server_artifacts:

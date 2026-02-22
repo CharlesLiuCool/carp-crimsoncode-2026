@@ -4,6 +4,8 @@ import PrivacySlider from "./PrivacySlider";
 import CSVPreview from "./CSVPreview";
 import { parseCSV, validateColumns, EXPECTED_COLUMNS } from "../utils/csv";
 
+const MIN_SAMPLES_WARNING = 50;
+
 export default function TrainTab() {
   const [file, setFile] = useState(null);
   const [parsed, setParsed] = useState(null);
@@ -12,6 +14,7 @@ export default function TrainTab() {
   const [lastEpsilon, setLastEpsilon] = useState(null);
   const [status, setStatus] = useState(null); // null | 'loading' | 'success' | 'error'
   const [statusMsg, setStatusMsg] = useState("");
+  const [datasetWarning, setDatasetWarning] = useState("");
   const fileRef = useRef();
 
   function handleFile(f) {
@@ -72,9 +75,11 @@ export default function TrainTab() {
         data.message ||
           "Model trained and weights uploaded to the central server successfully.",
       );
+      setDatasetWarning(data.warning || "");
     } catch (err) {
       setStatus("error");
       setStatusMsg(err.message || "Failed to connect to backend.");
+      setDatasetWarning("");
     }
   }
 
@@ -84,6 +89,7 @@ export default function TrainTab() {
     setError("");
     setStatus(null);
     setStatusMsg("");
+    setDatasetWarning("");
     setLastEpsilon(null);
     if (fileRef.current) fileRef.current.value = "";
   }
@@ -150,6 +156,12 @@ export default function TrainTab() {
           )}
         </div>
         {error && <p className="error-msg">{error}</p>}
+        {parsed && parsed.rows.length < MIN_SAMPLES_WARNING && (
+          <div className="alert alert-warning" style={{ marginTop: "10px" }}>
+            <strong>Small dataset:</strong> This file has {parsed.rows.length} rows.
+            Results may be unreliable. Consider using at least {MIN_SAMPLES_WARNING} samples.
+          </div>
+        )}
       </div>
 
       {parsed && <CSVPreview headers={parsed.headers} rows={parsed.rows} />}
@@ -160,12 +172,20 @@ export default function TrainTab() {
       </div>
 
       {status === "success" && (
-        <div className="alert alert-success">
-          <div>
-            <strong>Training Complete</strong>
-            <p>{statusMsg}</p>
+        <>
+          <div className="alert alert-success">
+            <div>
+              <strong>Training Complete</strong>
+              <p>{statusMsg}</p>
+            </div>
           </div>
-        </div>
+          {datasetWarning && (
+            <div className="alert alert-warning">
+              <strong>Warning</strong>
+              <p>{datasetWarning}</p>
+            </div>
+          )}
+        </>
       )}
       {status === "error" && (
         <div className="alert alert-error">
